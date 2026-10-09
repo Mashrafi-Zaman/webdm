@@ -9,9 +9,9 @@ import okio.Path.Companion.toOkioPath
 import java.io.File
 
 object FileNameConstants {
-    const val mainApp = "ABDownloadManager"
-    const val cliApp = "ABDownloadManagerCli"
-    const val nativeMessagingHost = "ABDownloadManagerNativeMessagingHost"
+    const val mainApp = "WebDM"
+    const val cliApp = "WebDMCli"
+    const val nativeMessagingHost = "WebDMNativeMessagingHost"
 }
 
 object AppInfo {
@@ -65,7 +65,7 @@ object AppInfo {
                 when (Platform.getCurrentPlatform()) {
                     Platform.Desktop.Linux -> it.parentFile // <installationFolder>/bin/ABDownloadManager
                     Platform.Desktop.MacOS -> it.findAppFolder() // /Applications/ABDownloadManager.app
-                    Platform.Desktop.Windows -> it // <installationFolder>/ABDownloadManager.exe
+                    Platform.Desktop.Windows -> it // <installationFolder>/WebDM.exe
                     else -> null
                 }?.path
             }

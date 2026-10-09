@@ -4,8 +4,8 @@ info:
   version: 1.0.0
   description: API for managing download tasks and queues.
 servers:
-  - url: http://localhost:15151
-    description: Default server running on port 15151
+  - url: http://localhost:15515
+    description: Default server running on port 15515
 
 paths:
   /add:

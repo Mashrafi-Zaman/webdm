@@ -46,7 +46,7 @@ class UpdateInstallerFromArchiveFile(
             it.readUtf8()
         }
         val scriptPathInTempFolder = FileSystem.SYSTEM_TEMPORARY_DIRECTORY.resolve(
-            "abdm-updater.$scriptExtension"
+            "webdm-updater.$scriptExtension"
         )
         scriptPathInTempFolder.toFile().writeText(scriptContent)
         val scriptContentFile = scriptPathInTempFolder.toString()
@@ -75,7 +75,7 @@ class UpdateInstallerFromArchiveFile(
             else -> error("platform $platform not supported")
         }
         val scriptToRun =
-            FileSystem.SYSTEM_TEMPORARY_DIRECTORY.resolve("abdm-updater.run.$scriptExtension")
+            FileSystem.SYSTEM_TEMPORARY_DIRECTORY.resolve("webdm-updater.run.$scriptExtension")
         scriptToRun.toFile().writeText(commandToRun)
         return scriptToRun.toString()
     }

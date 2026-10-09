@@ -153,7 +153,7 @@ nucleus {
             }
             packageVersion = getAppVersionStringForPackaging()
             packageName = getAppName()
-            vendor = "abdownloadmanager.com"
+            vendor = "WebDM"
             appResourcesRootDir.set(project.layout.projectDirectory.dir("resources"))
             val menuGroupName = getPrettifiedAppName()
             licenseFile.set(rootProject.file("LICENSE"))
@@ -205,13 +205,13 @@ installerPlugin {
         extraParams = mapOf(
             "native_messaging_host_binary_name" to nativeMessagingHostBinaryName,
             "cli_binary_name" to cliBinaryName,
-            "app_publisher" to "abdownloadmanager.com",
+            "app_publisher" to "WebDM",
             "app_version_with_build" to "${getAppVersionStringForPackaging(TargetFormat.Exe)}.0",
-            "source_code_url" to "https://github.com/amir1376/ab-download-manager",
-            "project_website" to "www.abdownloadmanager.com",
-            "copyright" to "© 2024-present AB Download Manager App",
-            "header_image_file" to project.file("resources/installer/abdm-header-image.bmp"),
-            "sidebar_image_file" to project.file("resources/installer/abdm-sidebar-image.bmp")
+            "source_code_url" to "https://github.com/YOUR_USERNAME/webdm",
+            "project_website" to "https://github.com/YOUR_USERNAME/webdm",
+            "copyright" to "© 2024-present AB Download Manager App; © 2026-present WebDM contributors",
+            "header_image_file" to project.file("resources/installer/webdm-header-image.bmp"),
+            "sidebar_image_file" to project.file("resources/installer/webdm-sidebar-image.bmp")
         )
     }
     macos {

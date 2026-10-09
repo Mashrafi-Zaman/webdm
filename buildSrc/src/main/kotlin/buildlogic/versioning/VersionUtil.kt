@@ -26,14 +26,14 @@ fun Project.getAppName(): String {
 }
 
 fun Project.getPrettifiedAppName(): String {
-    return "AB Download Manager"
+    return "Web Download Manager"
 }
 fun Project.getAppDataDirName(): String {
-    return ".abdm"
+    return ".webdm"
 }
 
 fun Project.getApplicationPackageName(): String {
-    return "com.abdownloadmanager"
+    return "com.webdm.app"
 }
 
 fun Project.getAppVersionStringForPackaging(targetFormat: TargetFormat? = null): String {

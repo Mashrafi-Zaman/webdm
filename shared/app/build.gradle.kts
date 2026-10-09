@@ -107,73 +107,73 @@ buildConfig {
     buildConfigField(
         "PROJECT_WEBSITE",
         provider {
-            "https://abdownloadmanager.com"
+            "https://github.com/YOUR_USERNAME/webdm"
         }
     )
     buildConfigField(
         "PROJECT_SOURCE_CODE",
         provider {
-            "https://github.com/amir1376/ab-download-manager"
+            "https://github.com/YOUR_USERNAME/webdm"
         }
     )
     buildConfigField(
         "DONATE_LINK",
         provider {
-            "https://abdownloadmanager.com/donate"
+            "https://github.com/YOUR_USERNAME/webdm"
         }
     )
     buildConfigField(
         "PROJECT_GITHUB_OWNER",
         provider {
-            "amir1376"
+            "YOUR_USERNAME"
         }
     )
     buildConfigField(
         "PROJECT_GITHUB_REPO",
         provider {
-            "ab-download-manager"
+            "webdm"
         }
     )
     buildConfigField(
         "PROJECT_TRANSLATIONS",
         provider {
-            "https://crowdin.com/project/ab-download-manager"
+            "https://github.com/YOUR_USERNAME/webdm"
         }
     )
     buildConfigField(
         "INTEGRATION_CHROME_LINK",
         provider {
-            "https://chromewebstore.google.com/detail/ab-download-manager-brows/bbobopahenonfdgjgaleledndnnfhooj"
+            "https://chromewebstore.google.com/detail/YOUR_CHROME_EXTENSION_ID"
         }
     )
     buildConfigField(
         "INTEGRATION_FIREFOX_LINK",
         provider {
-            "https://addons.mozilla.org/en-US/firefox/addon/ab-download-manager/"
+            "https://addons.mozilla.org/en-US/firefox/addon/YOUR_FIREFOX_ADDON_SLUG/"
         }
     )
     buildConfigField(
         "INTEGRATION_FIREFOX_EXTENSION_ID",
         provider {
-            "firefox-integration@abdownloadmanager.com"
+            "firefox-integration@webdm"
         }
     )
     buildConfigField(
         "INTEGRATION_CHROME_EXTENSION_ID",
         provider {
-            "chrome-extension://bbobopahenonfdgjgaleledndnnfhooj/"
+            "chrome-extension://YOUR_CHROME_EXTENSION_ID/"
         }
     )
     buildConfigField(
         "TELEGRAM_GROUP",
         provider {
-            "https://t.me/abdownloadmanager_discussion"
+            "https://github.com/YOUR_USERNAME/webdm/discussions"
         }
     )
     buildConfigField(
         "TELEGRAM_CHANNEL",
         provider {
-            "https://t.me/abdownloadmanager"
+            "https://github.com/YOUR_USERNAME/webdm/releases"
         }
     )
 }
