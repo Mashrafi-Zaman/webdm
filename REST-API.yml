@@ -10,27 +10,67 @@ servers:
 paths:
   /add:
     post:
-      summary: Add a new download source
+      summary: Add one or more downloads (shows the add-download UI unless silentAdd is set)
+      description: >
+        Matches AddDownloadsFromIntegration in integration/server. For backward compatibility the
+        server also accepts a bare JSON array of http items (treated as items with default options).
       requestBody:
-        description: Data for adding a download source
+        required: true
         content:
           application/json:
             schema:
-              type: array
-              items:
-                type: object
-                properties:
-                  link:
-                    type: string
-                    description: The link to the download source
-                  headers:
+              type: object
+              required: [ items ]
+              properties:
+                items:
+                  type: array
+                  items:
                     type: object
-                    additionalProperties:
-                      type: string
-                    description: Optional headers for the request
-                  downloadPage:
-                    type: string
-                    description: Optional download page URL
+                    required: [ type, link ]
+                    properties:
+                      type:
+                        type: string
+                        enum: [ http, hls ]
+                        description: Kind of download; "hls" for HLS (.m3u8) playlists
+                      link:
+                        type: string
+                        description: The link to the download source
+                      headers:
+                        type: object
+                        nullable: true
+                        additionalProperties:
+                          type: string
+                        description: Optional headers for the request
+                      downloadPage:
+                        type: string
+                        nullable: true
+                        description: Optional download page URL
+                      suggestedName:
+                        type: string
+                        nullable: true
+                        description: Optional suggested file name
+                options:
+                  type: object
+                  description: Optional; all fields default to false
+                  properties:
+                    silentAdd:
+                      type: boolean
+                      default: false
+                      description: Add without showing the add-download dialog
+                    silentStart:
+                      type: boolean
+                      default: false
+                      description: Start the download immediately after a silent add
+            example:
+              items:
+                - type: http
+                  link: https://example.com/file.zip
+                  headers: { "User-Agent": "Mozilla/5.0" }
+                  downloadPage: https://example.com/
+                  suggestedName: null
+              options:
+                silentAdd: false
+                silentStart: false
       responses:
         "200":
           description: Successfully added the download

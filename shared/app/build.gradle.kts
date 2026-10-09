@@ -161,7 +161,7 @@ buildConfig {
     buildConfigField(
         "INTEGRATION_CHROME_EXTENSION_ID",
         provider {
-            "chrome-extension://YOUR_CHROME_EXTENSION_ID/"
+            "chrome-extension://aciclgnjjaijdpnkkgileppmbpldobjj/"
         }
     )
     buildConfigField(
