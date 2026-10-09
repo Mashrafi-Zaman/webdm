@@ -169,6 +169,9 @@ FunctionEnd
 !macroend
 
 Function .onInstSuccess
+    ; Tell the shell that icons changed (SHCNE_ASSOCCHANGED, SHCNF_FLUSH) so the taskbar and
+    ; shortcuts don't keep a cached icon from a previous version installed at the same path
+    System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0x1000, p 0, p 0)'
     ; Check if the installer is running in silent mode
     ${If} ${Silent}
         ; In silent mode, always run the app
