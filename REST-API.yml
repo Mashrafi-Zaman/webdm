@@ -30,8 +30,13 @@ paths:
                     properties:
                       type:
                         type: string
-                        enum: [ http, hls ]
-                        description: Kind of download; "hls" for HLS (.m3u8) playlists
+                        enum: [ http, hls, segments ]
+                        description: >
+                          Kind of download; "hls" for HLS (.m3u8) playlists; "segments" for a stream the
+                          extension rebuilt from its numbered fMP4/TS segments because no manifest was found
+                          (download init + segments in order into ONE file; see init/segments below).
+                          NOTE: "segments" is sent by the extension since Prompt 8b; the app accepts it from
+                          Prompt 9 on (older apps reject the request).
                       link:
                         type: string
                         description: The link to the download source
@@ -49,6 +54,30 @@ paths:
                         type: string
                         nullable: true
                         description: Optional suggested file name
+                      init:
+                        type: string
+                        nullable: true
+                        description: >
+                          type "segments" only: URL of the init segment (fMP4 header), written before the
+                          segments; null for MPEG-TS segments
+                      segments:
+                        type: array
+                        items:
+                          type: string
+                        description: >
+                          type "segments" only (required there): media segment URLs in playback order;
+                          concatenated after init into one .mp4 (or .ts)
+                      audioInit:
+                        type: string
+                        nullable: true
+                        description: type "segments" only, optional - init segment of a separate audio track
+                      audioSegments:
+                        type: array
+                        items:
+                          type: string
+                        description: >
+                          type "segments" only, optional - segments of a separate audio track, in order;
+                          downloaded the same way, then merged with the video into one .mp4 (ffmpeg stream copy)
                 options:
                   type: object
                   description: Optional; all fields default to false
@@ -61,16 +90,38 @@ paths:
                       type: boolean
                       default: false
                       description: Start the download immediately after a silent add
-            example:
-              items:
-                - type: http
-                  link: https://example.com/file.zip
-                  headers: { "User-Agent": "Mozilla/5.0" }
-                  downloadPage: https://example.com/
-                  suggestedName: null
-              options:
-                silentAdd: false
-                silentStart: false
+            examples:
+              http:
+                value:
+                  items:
+                    - type: http
+                      link: https://example.com/file.zip
+                      headers: { "User-Agent": "Mozilla/5.0" }
+                      downloadPage: https://example.com/
+                      suggestedName: null
+                  options:
+                    silentAdd: false
+                    silentStart: false
+              segments:
+                summary: Stream rebuilt from segments (video + separate audio)
+                value:
+                  items:
+                    - type: segments
+                      link: https://cdn.example.com/v/abc/init-s1080p-v1.mp4
+                      headers: { "Referer": "https://example.com/watch/1" }
+                      downloadPage: https://example.com/watch/1
+                      suggestedName: "Example video - 1080p (rebuilt).mp4"
+                      init: https://cdn.example.com/v/abc/init-s1080p-v1.mp4
+                      segments:
+                        - https://cdn.example.com/v/abc/seg-1-s1080p-v1.m4s
+                        - https://cdn.example.com/v/abc/seg-2-s1080p-v1.m4s
+                      audioInit: https://cdn.example.com/v/abc/init-a1.mp4
+                      audioSegments:
+                        - https://cdn.example.com/v/abc/seg-1-a1.m4s
+                        - https://cdn.example.com/v/abc/seg-2-a1.m4s
+                  options:
+                    silentAdd: false
+                    silentStart: false
       responses:
         "200":
           description: Successfully added the download
