@@ -5,8 +5,6 @@ import com.mikepenz.aboutlibraries.plugin.DuplicateRule
 import dev.nucleusframework.desktop.application.dsl.TargetFormat
 import ir.amirab.util.platform.Arch
 import ir.amirab.util.platform.Platform
-import ir.amirab.util.platform.isLinux
-import ir.amirab.util.platform.isMac
 import ir.amirab.util.platform.isWindows
 
 plugins {
@@ -147,34 +145,13 @@ nucleus {
                 "jdk.unsupported",
                 "jdk.accessibility",
             )
-            if (Platform.isLinux()) {
-                // filekit library requires this module in linux.
-                modules("jdk.security.auth")
-            }
             packageVersion = getAppVersionStringForPackaging()
             packageName = getAppName()
             vendor = "WebDM"
             appResourcesRootDir.set(project.layout.projectDirectory.dir("resources"))
             val menuGroupName = getPrettifiedAppName()
             licenseFile.set(rootProject.file("LICENSE"))
-            linux {
-                appCategory = "Network"
-                iconFile = project.file("icons/icon.png")
-                menuGroup = menuGroupName
-                shortcut = true
-            }
-            macOS {
-                iconFile = project.file("icons/icon.icns")
-                infoPlist {
-                    extraKeysRawXml = """
-                            <key>LSUIElement</key>
-                            <string>true</string>
-                        """.trimIndent()
-                }
-                if (Platform.isMac()) {
-                    jvmArgs("-Dapple.awt.enableTemplateImages=true")
-                }
-            }
+            // WebDM targets Windows x64 only; Linux/macOS packaging is not configured.
             windows {
                 upgradeUuid = providers.gradleProperty("INSTALLER.WINDOWS.UPGRADE_UUID").orNull
                 iconFile = project.file("icons/icon.ico")
@@ -214,15 +191,6 @@ installerPlugin {
             "sidebar_image_file" to project.file("resources/installer/webdm-sidebar-image.bmp")
         )
     }
-    macos {
-        appName = getAppName()
-        inputDir = project.file("build/compose/binaries/main-release/app/")
-        appFileName = "${getAppName()}.app"
-        backgroundImage = project.file("resources/installer/dmg_background.png")
-        outputFileName = getAppName()
-        licenseFile = rootProject.file("LICENSE")
-        volumeIcon = project.file("icons/icon.icns")
-    }
 }
 
 /**
@@ -251,9 +219,6 @@ fun defaultJvmArgs(): Array<String> {
         add("--enable-native-access=ALL-UNNAMED")
         add("-Dnucleus.executable.type=dev")
         add("-Dnucleus.app.id=${getAppName()}")
-        if (Platform.isMac()) {
-            add("-Dapple.awt.enableTemplateImages=true")
-        }
         add("-Dskiko.library.path=${appDir()}")
     }.toTypedArray()
 }
@@ -299,30 +264,23 @@ fun AbstractArchiveTask.preserveFileAttributes() {
     useFileSystemPermissions()
 }
 
-val createDistributableAppArchiveTar = tasks.register("createDistributableAppArchiveTar", Tar::class) {
-    dependsOn(postReleaseDistributable)
-    preserveFileAttributes()
-    archiveFileName.set("app.tar.gz")
-    compression = Compression.GZIP
-    fromAppImagePath()
-}
 val createDistributableAppArchiveZip = tasks.register("createDistributableAppArchiveZip", Zip::class) {
     dependsOn(postReleaseDistributable)
     preserveFileAttributes()
     archiveFileName.set("app.zip")
     fromAppImagePath()
 }
+// WebDM ships Windows x64 only (.exe installer + .zip)
 val createDistributableAppArchive = tasks.register("createDistributableAppArchive") {
-    when (Platform.getCurrentPlatform()) {
-        Platform.Desktop.Linux,
-        Platform.Desktop.MacOS -> dependsOn(createDistributableAppArchiveTar)
-
-        Platform.Desktop.Windows -> dependsOn(createDistributableAppArchiveZip)
-        Platform.Android -> error("this task is used for desktop only")
-    }
+    dependsOn(createDistributableAppArchiveZip)
 }
 
 tasks.register(CiUtils.getCreateBinaryFolderForCiTaskName()) {
+    doFirst {
+        require(Platform.isWindows() && Arch.getCurrentArch() == Arch.X64) {
+            "WebDM release binaries can only be built on Windows x64 (current: ${Platform.getCurrentPlatform()} ${Arch.getCurrentArch()})"
+        }
+    }
     if (installerPlugin.isThisPlatformSupported()) {
         dependsOn(installerPlugin.createInstallerTask)
         inputs.dir(installerPlugin.outputFolder)

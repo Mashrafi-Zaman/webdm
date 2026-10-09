@@ -68,9 +68,10 @@ val createChangeNoteForCi = tasks.register("createChangeNoteForCi") {
 val createReleaseFolderForCi = tasks.register("createReleaseFolderForCi") {
     val createBinariesForCi = CiUtils.getCreateBinaryFolderForCiTaskName()
     dependsOn("desktop:app:$createBinariesForCi")
+    // WebDM targets Windows x64 only: Android is skipped unless SKIP_ANDROID_BUILD=false
     val skipAndroidBuild = System.getenv("SKIP_ANDROID_BUILD")
         ?.toBoolean()
-        ?: false
+        ?: true
     if (!skipAndroidBuild) {
         dependsOn("android:app:$createBinariesForCi")
     }
