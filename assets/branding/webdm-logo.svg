@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>WebDM logo</title>
+  <!-- WebDM palette: Navy #172A46, Coral #FF6A3D, Cream #FFF3E6 -->
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#172A46"/>
+  <!-- wireframe globe -->
+  <g fill="none" stroke="#FFF3E6" stroke-width="10" stroke-linecap="round">
+    <circle cx="128" cy="118" r="78"/>
+    <ellipse cx="128" cy="118" rx="38" ry="78"/>
+    <path d="M50 118H206"/>
+    <path d="M61 79H195"/>
+    <path d="M61 157H195"/>
+  </g>
+  <!-- download arrow (acts as the central meridian), outlined in navy to cut the globe lines -->
+  <path d="M112 46H144V146H178L128 210L78 146H112Z" fill="none" stroke="#172A46" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M112 46H144V146H178L128 210L78 146H112Z" fill="#FF6A3D" stroke="#FF6A3D" stroke-width="4" stroke-linejoin="round"/>
+</svg>

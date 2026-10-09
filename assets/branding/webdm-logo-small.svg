@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>WebDM logo (small sizes, 16-32 px)</title>
+  <!-- Simplified variant: full-bleed tile, thick globe ring, wide arrow. Palette: Navy #172A46, Coral #FF6A3D, Cream #FFF3E6 -->
+  <rect width="256" height="256" rx="48" fill="#172A46"/>
+  <circle cx="128" cy="116" r="80" fill="none" stroke="#FFF3E6" stroke-width="28"/>
+  <path d="M104 36H152V136H196L128 222L60 136H104Z" fill="none" stroke="#172A46" stroke-width="22" stroke-linejoin="round"/>
+  <path d="M104 36H152V136H196L128 222L60 136H104Z" fill="#FF6A3D" stroke="#FF6A3D" stroke-width="4" stroke-linejoin="round"/>
+</svg>
