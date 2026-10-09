@@ -207,8 +207,8 @@ installerPlugin {
             "cli_binary_name" to cliBinaryName,
             "app_publisher" to "WebDM",
             "app_version_with_build" to "${getAppVersionStringForPackaging(TargetFormat.Exe)}.0",
-            "source_code_url" to "https://github.com/YOUR_USERNAME/webdm",
-            "project_website" to "https://github.com/YOUR_USERNAME/webdm",
+            "source_code_url" to "https://github.com/Mashrafi-Zaman/webdm",
+            "project_website" to "https://github.com/Mashrafi-Zaman/webdm",
             "copyright" to "© 2024-present AB Download Manager App; © 2026-present WebDM contributors",
             "header_image_file" to project.file("resources/installer/webdm-header-image.bmp"),
             "sidebar_image_file" to project.file("resources/installer/webdm-sidebar-image.bmp")

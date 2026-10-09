@@ -107,25 +107,25 @@ buildConfig {
     buildConfigField(
         "PROJECT_WEBSITE",
         provider {
-            "https://github.com/YOUR_USERNAME/webdm"
+            "https://github.com/Mashrafi-Zaman/webdm"
         }
     )
     buildConfigField(
         "PROJECT_SOURCE_CODE",
         provider {
-            "https://github.com/YOUR_USERNAME/webdm"
+            "https://github.com/Mashrafi-Zaman/webdm"
         }
     )
     buildConfigField(
         "DONATE_LINK",
         provider {
-            "https://github.com/YOUR_USERNAME/webdm"
+            "https://github.com/Mashrafi-Zaman/webdm"
         }
     )
     buildConfigField(
         "PROJECT_GITHUB_OWNER",
         provider {
-            "YOUR_USERNAME"
+            "Mashrafi-Zaman"
         }
     )
     buildConfigField(
@@ -137,7 +137,7 @@ buildConfig {
     buildConfigField(
         "PROJECT_TRANSLATIONS",
         provider {
-            "https://github.com/YOUR_USERNAME/webdm"
+            "https://github.com/Mashrafi-Zaman/webdm"
         }
     )
     buildConfigField(
@@ -167,13 +167,13 @@ buildConfig {
     buildConfigField(
         "TELEGRAM_GROUP",
         provider {
-            "https://github.com/YOUR_USERNAME/webdm/discussions"
+            "https://github.com/Mashrafi-Zaman/webdm/discussions"
         }
     )
     buildConfigField(
         "TELEGRAM_CHANNEL",
         provider {
-            "https://github.com/YOUR_USERNAME/webdm/releases"
+            "https://github.com/Mashrafi-Zaman/webdm/releases"
         }
     )
 }
