@@ -203,7 +203,6 @@ class HomeComponent(
                 +shutdown
                 separator()
             }
-            +browserIntegrations
             if (Platform.isLinux()) {
                 +createDesktopEntryAction
             }
