@@ -88,6 +88,8 @@ import org.koin.dsl.bind
 import org.koin.dsl.module
 import com.abdownloadmanager.updatechecker.GithubUpdateChecker
 import com.abdownloadmanager.desktop.tools.FfmpegManager
+import com.abdownloadmanager.desktop.tools.YtDlpManager
+import com.abdownloadmanager.desktop.tools.DesktopMediaTools
 import ir.amirab.downloader.downloaditem.hls.HLSMediaTools
 import com.abdownloadmanager.updatechecker.UpdateChecker
 import ir.amirab.util.AppVersionTracker
@@ -230,7 +232,13 @@ val downloaderModule = module {
     // ffmpeg (Settings > Tools); also the HLS downloader's media tools
     single {
         FfmpegManager(scope = get())
-    }.bind<HLSMediaTools>()
+    }
+    single {
+        YtDlpManager(scope = get())
+    }
+    single<HLSMediaTools> {
+        DesktopMediaTools(ffmpeg = get(), ytDlp = get())
+    }
     single {
         HLSDownloader(inject(), get())
     }
@@ -245,8 +253,9 @@ val downloaderModule = module {
     }
     single {
         DownloaderInUiRegistry().apply {
-            add(get<HttpDownloaderInUi>())
+            // HLS first: it only claims .m3u8 links and video pages (yt-dlp); everything else falls to HTTP
             add(get<HLSDownloaderInUi>())
+            add(get<HttpDownloaderInUi>())
         }
     }.bind<DownloadItemStateFactory<IDownloadItem, DownloadJob>>()
     single {

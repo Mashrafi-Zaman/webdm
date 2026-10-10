@@ -16,7 +16,8 @@ data class ApiCapabilities(
     val features: Map<String, Boolean>,
 ) {
     companion object {
-        val JOB_TYPES = listOf("http", "hls", "segments", "av")
+        // "page": a video page for yt-dlp (shipped with the app; HTTP /capabilities drops it if yt-dlp is missing)
+        val JOB_TYPES = listOf("http", "hls", "segments", "av", "page")
 
         /** features that don't depend on installed tools */
         fun baseFeatures(): Map<String, Boolean> = mapOf(

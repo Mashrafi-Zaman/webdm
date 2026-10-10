@@ -17,6 +17,7 @@ import com.abdownloadmanager.shared.ui.configurable.item.BooleanConfigurable
 import com.abdownloadmanager.shared.ui.configurable.item.NavigatableConfigurable
 import com.abdownloadmanager.shared.ui.configurable.item.StringConfigurable
 import com.abdownloadmanager.desktop.tools.FfmpegManager
+import com.abdownloadmanager.desktop.tools.YtDlpManager
 import ir.amirab.util.flow.createMutableStateFlowFromStateFlow
 import com.abdownloadmanager.shared.ui.theme.ThemeManager
 import com.abdownloadmanager.shared.util.proxy.ProxyManager
@@ -72,6 +73,7 @@ class DesktopSettingsComponent(
     private val fontManager by inject<FontManager>()
     private val customRenderApi by inject<CustomRenderApi>()
     private val ffmpegManager by inject<FfmpegManager>()
+    private val ytDlpManager by inject<YtDlpManager>()
     private val allConfigs = object : SettingSectionGetter {
         override operator fun get(key: SettingSection): List<ConfigurableGroup> {
             return when (key) {
@@ -188,7 +190,47 @@ class DesktopSettingsComponent(
                                 },
                             ),
                         )
-                    )
+                    ),
+                    ConfigurableGroup(
+                        nestedConfigurable = listOf(
+                            StringConfigurable(
+                                title = "yt-dlp".asStringSource(),
+                                description = ("Reads video pages (YouTube, Facebook, Instagram and many more) so " +
+                                        "WebDM can download the video in the quality you choose.").asStringSource(),
+                                backedBy = createMutableStateFlowFromStateFlow(
+                                    flow = ytDlpManager.status,
+                                    updater = {},
+                                    scope = scope,
+                                ),
+                                describe = { it.asStringSource() },
+                                enabled = MutableStateFlow(false),
+                            ),
+                            NavigatableConfigurable(
+                                title = "Download or update yt-dlp".asStringSource(),
+                                description = ("Downloads the latest yt-dlp.exe from github.com/yt-dlp/yt-dlp, checks " +
+                                        "it against the release's SHA-256 checksums and installs it with its license " +
+                                        "into WebDM's tools folder. Update it when a site stops working.").asStringSource(),
+                                onRequestNavigate = { ytDlpManager.downloadOrUpdate() },
+                            ),
+                            NavigatableConfigurable(
+                                title = "Show yt-dlp license".asStringSource(),
+                                description = "Opens yt-dlp's license (Unlicense).".asStringSource(),
+                                onRequestNavigate = {
+                                    runCatching { java.awt.Desktop.getDesktop().open(ytDlpManager.licenseFile) }
+                                },
+                            ),
+                            BooleanConfigurable(
+                                title = "Use browser cookies for video sites".asStringSource(),
+                                description = ("For videos that need a login: the browser extension sends that site's " +
+                                        "cookies with the page, and yt-dlp uses them only to read the page. They " +
+                                        "are never saved.").asStringSource(),
+                                backedBy = ytDlpManager.useBrowserCookiesSetting,
+                                describe = {
+                                    if (it) Res.string.enabled.asStringSource() else Res.string.disabled.asStringSource()
+                                },
+                            ),
+                        )
+                    ),
                 )
 
                 DownloadEngine -> listOf(

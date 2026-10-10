@@ -16,3 +16,5 @@ Third-party tools shipped with the Windows installer:
 - FFmpeg (https://ffmpeg.org), an LGPL-2.1-or-later build from https://github.com/BtbN/FFmpeg-Builds, used as a
   separate program (resources/tools/ffmpeg). Its license (LICENSE.txt) and the exact build and source location
   (SOURCE.txt) are installed next to ffmpeg.exe. FFmpeg is a trademark of Fabrice Bellard.
+- yt-dlp (https://github.com/yt-dlp/yt-dlp), released under the Unlicense, used as a separate program
+  (resources/tools/yt-dlp) to read video pages. Its license and build source are installed next to yt-dlp.exe.

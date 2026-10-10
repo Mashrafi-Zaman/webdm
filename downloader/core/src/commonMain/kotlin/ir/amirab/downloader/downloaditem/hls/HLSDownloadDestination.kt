@@ -67,8 +67,13 @@ class HLSDownloadDestination(
     }
 
     private fun isFmp4(parts: List<MediaSegment>): Boolean {
-        return parts.any { it.isInit } || parts.firstOrNull()?.link?.substringBefore('?')?.substringAfterLast('.')
-            ?.lowercase() in setOf("m4s", "mp4", "m4a", "m4v", "cmfv", "cmfa", "fmp4")
+        val extension = parts.firstOrNull()?.link?.substringBefore('?')?.substringAfterLast('/')
+            ?.let { name -> name.substringAfterLast('.', "") }?.lowercase()
+        // one whole file in byte-range parts ({type:"av"}, video sites): joined it is that file again (MP4 family),
+        // unless it's a single .ts
+        val wholeFile = parts.isNotEmpty() && parts.all { it.link == parts[0].link && it.rangeStart != null }
+        return parts.any { it.isInit } || extension in setOf("m4s", "mp4", "m4a", "m4v", "cmfv", "cmfa", "fmp4") ||
+                (wholeFile && extension != "ts")
     }
 
     private fun extensionOf(parts: List<MediaSegment>) = if (isFmp4(parts)) "mp4" else "ts"

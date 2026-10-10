@@ -20,4 +20,10 @@ interface IHLSCredentials : IHttpBasedDownloadCredentials {
 
     /** estimated total size in bytes (rebuilt streams), shown in the add-download dialog */
     val estimatedSize: Long?
+
+    /** [link] is a video page for the site extractor (yt-dlp: YouTube, Facebook ...), not a playlist */
+    val sitePage: Boolean get() = false
+
+    /** cookies.txt text for the site extractor, when the user allowed it; never saved */
+    val siteCookies: String? get() = null
 }

@@ -30,13 +30,15 @@ paths:
                     properties:
                       type:
                         type: string
-                        enum: [ http, hls, segments, av ]
+                        enum: [ http, hls, segments, av, page ]
                         description: >
                           Kind of download; "hls" for HLS (.m3u8) playlists; "segments" for a stream the
                           extension rebuilt from its numbered fMP4/TS segments because no manifest was found
                           (download init + segments in order into ONE file; see init/segments below); "av" for a
                           video whose picture and sound are two separate whole files (DASH-style, often fetched by
-                          the player in byte ranges): both are downloaded and merged into ONE .mp4 (needs ffmpeg).
+                          the player in byte ranges): both are downloaded and merged into ONE .mp4 (needs ffmpeg);
+                          "page" for a video page (YouTube, Facebook, Instagram ...): only its URL; the app reads it
+                          with yt-dlp, offers the qualities and downloads/merges the chosen one.
                           Clients must check GET /capabilities first and only send types listed in jobTypes
                           (apps without /capabilities don't support "segments" or "av").
                       link:
@@ -102,6 +104,23 @@ paths:
                         type: string
                         nullable: true
                         description: type "av" only, optional - URL of the whole audio file
+                      cookies:
+                        type: array
+                        description: >
+                          type "page" only, optional - that site's browser cookies, for videos that need a login.
+                          Send them only when GET /capabilities has features["page.cookies"] = true (the user turned
+                          on "Use browser cookies"); the app uses them only to read the page and never saves them.
+                        items:
+                          type: object
+                          required: [ name, value, domain ]
+                          properties:
+                            name: { type: string }
+                            value: { type: string }
+                            domain: { type: string }
+                            path: { type: string, default: "/" }
+                            secure: { type: boolean, default: false }
+                            httpOnly: { type: boolean, default: false }
+                            expirationDate: { type: number, nullable: true, description: seconds since the epoch }
                       videoSize:
                         type: integer
                         format: int64
@@ -177,6 +196,16 @@ paths:
                   options:
                     silentAdd: false
                     silentStart: false
+              page:
+                summary: A video page read with yt-dlp
+                value:
+                  items:
+                    - type: page
+                      link: https://www.youtube.com/watch?v=jNQXAC9IVRw
+                      downloadPage: https://www.youtube.com/watch?v=jNQXAC9IVRw
+                  options:
+                    silentAdd: false
+                    silentStart: false
       responses:
         "200":
           description: Successfully added the download
@@ -212,14 +241,16 @@ paths:
                     items:
                       type: string
                     description: /add item types accepted
-                    example: [ http, hls, segments, av ]
+                    example: [ http, hls, segments, av, page ]
                   features:
                     type: object
                     additionalProperties:
                       type: boolean
                     description: >
                       hls.masterPlaylists, hls.aes128, hls.fmp4, hls.byteRange, hls.discontinuity, hls.live,
-                      and ffmpeg (installed right now; needed for separate audio tracks, SAMPLE-AES and .ts -> .mp4)
+                      ffmpeg (installed right now; needed for separate audio tracks, SAMPLE-AES and .ts -> .mp4),
+                      ytdlp (video pages can be read; jobTypes then contains "page") and page.cookies (the user
+                      allows sending a site's cookies with "page" jobs)
 
   /queues:
     get:

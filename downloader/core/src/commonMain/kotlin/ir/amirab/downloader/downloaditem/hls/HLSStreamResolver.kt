@@ -35,9 +35,12 @@ data class HLSVariantOption(
     val width: Int?,
     val height: Int?,
     val audioGroup: String?,
+    // a ready label (site formats: "1080p60", "Audio only")
+    val name: String? = null,
 ) {
     val label: String
         get() = when {
+            name != null -> name
             height != null -> "${height}p"
             else -> "${bandwidth / 1000} kbps"
         }
@@ -59,15 +62,23 @@ data class ResolvedHLSStream(
     val selectedVariant: HLSVariantOption?,
     val encryption: HLSEncryption,
     val format: HLSSegmentFormat,
+    // site pages (yt-dlp): headers the file URLs must be requested with, the video title, the result's extension
+    val requestHeaders: Map<String, String> = emptyMap(),
+    val title: String? = null,
+    val extensionOverride: String? = null,
 ) {
     val isLive: Boolean get() = video.playlist.ongoing()
     val duration: Double get() = video.playlist.mediaSegments().sumOf { it.duration() }
     val mediaSegmentCount: Int get() = video.parts.count { !it.isInit }
     val allParts: List<MediaSegment> get() = video.parts + audio?.parts.orEmpty()
 
+    /** the exact total size when every part is a known byte range (whole files: av jobs, video sites) */
+    val knownSize: Long?
+        get() = allParts.takeIf { list -> list.isNotEmpty() && list.all { it.rangeLength != null } }?.sumOf { it.rangeLength!! }
+
     /** the file extension of the result */
     val outputExtension: String
-        get() = if (format == HLSSegmentFormat.Fmp4 || audio != null) "mp4" else "ts"
+        get() = extensionOverride ?: if (format == HLSSegmentFormat.Fmp4 || audio != null) "mp4" else "ts"
 }
 
 /** These stop the download (no retries): retrying can't help. */
