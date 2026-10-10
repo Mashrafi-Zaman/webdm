@@ -51,6 +51,15 @@ class HLSDownloadJob(
     var isLiveRecording = false
         private set
 
+    // the last parts can complete at the same moment: finish (assemble the file) only once per session
+    private val finishRequested = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    private fun finishOnce() {
+        if (finishRequested.compareAndSet(false, true)) {
+            onDownloadFinished()
+        }
+    }
+
     // number of media segments (without init segments), for the progress window
     fun getSegmentProgress(): Pair<Int, Int> {
         val media = getParts().filter { !it.isInit }
@@ -147,10 +156,11 @@ class HLSDownloadJob(
         return newActiveScope.launch {
             //boot download item from storage!
             boot()
+            finishRequested.set(false)
             // if download item is booted and parts is not empty it means that we resumed that file in some point
             // but we should check if all parts are already downloaded to finish the job before hitting the server unnecessarily!
             if (parts.isNotEmpty() && parts.all { it.isCompleted } && !isLiveRecording) {
-                onDownloadFinished()
+                finishOnce()
                 return@launch
             }
             onDownloadResuming()
@@ -447,7 +457,7 @@ class HLSDownloadJob(
             PartDownloadStatus.Completed -> {
                 destination.onPartCancelled(partDownloader.part)
                 if (getParts().all { it.isCompleted } && !isLiveRecording) {
-                    onDownloadFinished()
+                    finishOnce()
                 } else {
                     scope.launch {
                         beginDownloadParts()
@@ -624,7 +634,7 @@ class HLSDownloadJob(
                 if (!stream.isLive) {
                     // the stream ended (EXT-X-ENDLIST appeared)
                     isLiveRecording = false
-                    if (getParts().all { it.isCompleted }) onDownloadFinished()
+                    if (getParts().all { it.isCompleted }) finishOnce()
                 }
                 saveState()
             }
@@ -637,7 +647,7 @@ class HLSDownloadJob(
         clearPartDownloaderList()
         setParts(getParts().filter { it.isCompleted })
         saveState()
-        onDownloadFinished()
+        finishOnce()
     }
 
     private suspend fun downloadWithFfmpeg(stream: ResolvedHLSStream) {
@@ -674,7 +684,7 @@ class HLSDownloadJob(
         }
         // ffmpeg wrote the whole file: nothing left to download or assemble
         setParts(getParts().map { it.copy(isCompleted = true) })
-        onDownloadFinished()
+        finishOnce()
     }
 
     suspend fun cancelDownloadScope() {

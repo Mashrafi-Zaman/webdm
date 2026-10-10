@@ -44,14 +44,15 @@ open class SegmentedDownloadDestination(
     }
 
     override fun onPartCancelled(part: DownloadPart) {
-        super.onPartCancelled(part)
         val id = part.getID()
+        // close the part's file handles BEFORE super removes them from fileParts (closing them after the removal
+        // found nothing, so the handles stayed open and the temp parts couldn't be deleted on Windows)
         synchronized(this) {
             fileParts
-                .find { it.id == id }
-                ?.writer
-                ?.closeQuietly()
+                .filter { it.id == id }
+                .forEach { it.writer.closeQuietly() }
         }
+        super.onPartCancelled(part)
     }
 
 
@@ -72,6 +73,11 @@ open class SegmentedDownloadDestination(
     }
 
     override fun cleanUpJunkFiles() {
+        // open handles would keep Windows from deleting the part files
+        synchronized(this) {
+            fileParts.forEach { it.writer.closeQuietly() }
+            fileParts.clear()
+        }
         runCatching {
             FileSystem.SYSTEM.deleteRecursively(tempDirectory.toOkioPath())
         }

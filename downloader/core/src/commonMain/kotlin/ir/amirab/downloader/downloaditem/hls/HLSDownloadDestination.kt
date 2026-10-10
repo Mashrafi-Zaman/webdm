@@ -26,6 +26,8 @@ class HLSDownloadDestination(
 ) {
     private val allParts = getAllParts
 
+    // never two assemblies at once (they would rewrite the same temp files under each other)
+    @Synchronized
     override fun assembleOutput(onProgressUpdate: (Int?) -> Unit) {
         val parts = allParts().filterIsInstance<MediaSegment>().sortedBy { it.getID() }
         val video = parts.filter { it.track == 0 }
