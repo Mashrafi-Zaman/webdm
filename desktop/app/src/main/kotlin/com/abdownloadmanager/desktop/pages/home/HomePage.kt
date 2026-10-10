@@ -268,6 +268,8 @@ fun HomePage(component: HomeComponent) {
 
                         override fun onDrop(event: DragAndDropEvent): Boolean {
                             isDragging = false
+                            // never a "move": Explorer would delete the dropped file afterwards
+                            com.abdownloadmanager.desktop.floatingdrop.acceptAsCopy(event)
                             if (Platform.isMac()) {
                                 onDraggedIn(event)
                             }
