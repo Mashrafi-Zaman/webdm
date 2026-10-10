@@ -412,10 +412,31 @@ abstract class BaseAddSingleDownloadComponent(
                     // ensure all values are set!
                     credentials.map { it.link }.first { it.isNotEmpty() }
                     folder.first { it.isNotEmpty() }
-                    name.first { it.isNotEmpty() }
                 }
             } catch (_: Exception) {
                 onRequestClose()
+                return@launch
+            }
+            // the name may come from the link check, which takes a while for video pages (yt-dlp reads them); stop
+            // waiting as soon as the check ended without one (e.g. an error)
+            var sawLinkLoading = false
+            val gotName = withTimeoutOrNull(90.seconds) {
+                while (true) {
+                    if (name.value.isNotEmpty()) return@withTimeoutOrNull true
+                    if (isLinkLoading.value) {
+                        sawLinkLoading = true
+                    } else if (sawLinkLoading) {
+                        delay(300)
+                        return@withTimeoutOrNull name.value.isNotEmpty()
+                    }
+                    delay(100)
+                }
+                @Suppress("UNREACHABLE_CODE")
+                false
+            }
+            if (gotName != true) {
+                // never drop it silently: let the user see what's wrong
+                _shouldShowWindow.value = true
                 return@launch
             }
             val failAutoAdd = async {

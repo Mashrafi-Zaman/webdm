@@ -64,11 +64,12 @@ class HLSLinkChecker(
     }
 
     override suspend fun actualCheck(credentials: HLSDownloadCredentials): HLSResponseInfo {
-        return HLSResponseInfo.resolve(client, credentials)
+        // video pages (YouTube, Facebook ...) are described by yt-dlp
+        return HLSResponseInfo.resolve(client, credentials, mediaTools.siteExtractor())
     }
 
     companion object {
-        private val PLAYLIST_EXTENSIONS = setOf("m3u8", "m3u", "ts", "mp4", "m4s")
+        private val PLAYLIST_EXTENSIONS = setOf("m3u8", "m3u", "ts", "mp4", "m4s", "m4a", "webm", "mp3")
 
         fun withExtension(name: String, extension: String): String {
             val dot = name.lastIndexOf('.')

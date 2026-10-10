@@ -62,12 +62,23 @@ class HLSDownloaderInUi(
         return item is IHLSCredentials
     }
 
+    /**
+     * Picked automatically (it's checked before the HTTP downloader) for .m3u8 links and for video pages yt-dlp
+     * handles (YouTube, Facebook ...); anything else goes to the HTTP downloader (the user can still pick HLS).
+     */
     override fun supportsThisLink(link: String): Boolean {
-        return HttpUrlUtils.isValidUrl(link)
+        if (!HttpUrlUtils.isValidUrl(link)) return false
+        return isPlaylistLink(link) || isVideoPage(link)
     }
 
+    private fun isPlaylistLink(link: String): Boolean =
+        link.substringBefore('?').substringBefore('#').lowercase().let { it.endsWith(".m3u8") || it.endsWith(".m3u") }
+
+    private fun isVideoPage(link: String): Boolean =
+        !isPlaylistLink(link) && downloader.mediaTools.siteExtractor()?.supportsUrl(link) == true
+
     override fun createMinimumCredentials(link: String): HLSDownloadCredentials {
-        return HLSDownloadCredentials(link = link)
+        return HLSDownloadCredentials(link = link, sitePage = isVideoPage(link))
     }
 
     override fun createBareDownloadItem(

@@ -14,6 +14,14 @@ class HlsItemToCredentialMapper : CredentialAndItemMapper<
             username = item.username,
             password = item.password,
             userAgent = item.userAgent,
+            // keep what isn't a plain playlist URL (rebuilt / av streams, site pages), or editing would lose it
+            selectedVariantUrl = item.selectedVariantUrl,
+            embeddedPlaylist = item.embeddedPlaylist,
+            embeddedAudioPlaylist = item.embeddedAudioPlaylist,
+            displayQuality = item.displayQuality,
+            estimatedSize = item.estimatedSize,
+            sitePage = item.sitePage,
+            siteCookies = item.siteCookies,
         )
     }
 

@@ -21,6 +21,9 @@ data class HLSDownloadCredentials(
     override val embeddedAudioPlaylist: String? = null,
     override val displayQuality: String? = null,
     override val estimatedSize: Long? = null,
+    override val sitePage: Boolean = false,
+    @kotlinx.serialization.Transient
+    override val siteCookies: String? = null,
 ) : IHLSCredentials {
     override fun copy(
         link: Option<String>,

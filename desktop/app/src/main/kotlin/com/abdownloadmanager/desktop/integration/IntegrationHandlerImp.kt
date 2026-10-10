@@ -29,6 +29,7 @@ class IntegrationHandlerImp : IntegrationHandler, KoinComponent {
     val appSettings by inject<AppRepository>()
     private val downloaderInUiRegistry by inject<DownloaderInUiRegistry>()
     private val mediaTools by inject<HLSMediaTools>()
+    private val ytDlp by inject<com.abdownloadmanager.desktop.tools.YtDlpManager>()
 
     override suspend fun addDownloadByGui(
         request: AddDownloadsFromIntegration
@@ -53,10 +54,14 @@ class IntegrationHandlerImp : IntegrationHandler, KoinComponent {
         return ApiCapabilities(
             app = AppInfo.displayName,
             version = AppInfo.version.toString(),
-            jobTypes = ApiCapabilities.JOB_TYPES,
+            jobTypes = ApiCapabilities.JOB_TYPES.filter { it != "page" || mediaTools.siteExtractor() != null },
             features = ApiCapabilities.baseFeatures() + mapOf(
                 // separate audio tracks, SAMPLE-AES and .ts -> .mp4 need it
                 "ffmpeg" to (mediaTools.ffmpegPath() != null),
+                // video pages (YouTube, Facebook ...) read with yt-dlp
+                "ytdlp" to (mediaTools.siteExtractor() != null),
+                // the extension may send a page's cookies (Settings > Tools > "Use browser cookies")
+                "page.cookies" to ytDlp.useBrowserCookiesSetting.value,
             ),
         )
     }
@@ -137,6 +142,19 @@ class IntegrationHandlerImp : IntegrationHandler, KoinComponent {
                         },
                         displayQuality = it.quality,
                         estimatedSize = it.estimatedSize,
+                    )
+                }
+
+                is PageDownloadCredentialsFromIntegration -> {
+                    // a video page: yt-dlp lists its formats, WebDM downloads the chosen quality like an HLS stream
+                    HLSDownloadCredentials(
+                        link = it.link,
+                        headers = it.headers,
+                        downloadPage = it.downloadPage ?: it.link,
+                        sitePage = true,
+                        siteCookies = it.cookies?.takeIf { list -> list.isNotEmpty() }?.let { list ->
+                            "# Netscape HTTP Cookie File\n" + list.joinToString("\n") { c -> c.toNetscapeLine() } + "\n"
+                        },
                     )
                 }
 

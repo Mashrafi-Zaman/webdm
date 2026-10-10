@@ -501,6 +501,20 @@ class HLSDownloadJob(
         }
     }
 
+    // headers the resolved stream's URLs need (site pages: the User-Agent etc. yt-dlp used); refreshed on resolve
+    @Volatile
+    private var streamHeaders: Map<String, String> = emptyMap()
+
+    // the last resolved stream (live recordings of video pages refresh its playlists, not the whole page)
+    @Volatile
+    private var lastResolvedStream: ResolvedHLSStream? = null
+
+    private fun partCredentials(): IHLSCredentials {
+        val extra = streamHeaders
+        if (extra.isEmpty()) return downloadItem
+        return downloadItem.copy(headers = downloadItem.headers.orEmpty() + extra)
+    }
+
     private fun getOrCreatePartDownloader(part: MediaSegment): HLSPartDownloader {
         synchronized(partDownloaderList) {
             return partDownloaderList.getOrPut(part.getID()) {
@@ -515,7 +529,7 @@ class HLSDownloadJob(
                         downloadManager.speedLimiter,
                         speedLimiter,
                     ),
-                    credentials = { downloadItem },
+                    credentials = { partCredentials() },
                     keyProvider = keyProvider,
                 ).also { partDownloader: HLSPartDownloader ->
                     partDownloader.onTooManyErrors = {
@@ -542,10 +556,13 @@ class HLSDownloadJob(
     private suspend fun fetchDownloadInfoAndValidate(): ResolvedHLSStream? {
         var stream: ResolvedHLSStream? = null
         if (parts.isEmpty() || isLiveRecording || downloadItem.liveRecording || needsStreamInfo()) {
-            stream = pendingStreamFromDialog?.takeIf { parts.isEmpty() }
-                ?: HLSResponseInfo.resolve(client, downloadItem).stream
+            // site pages are resolved on every resume (their file URLs expire); the dialog's result is fresh
+            stream = pendingStreamFromDialog?.takeIf { parts.isEmpty() || downloadItem.sitePage }
+                ?: HLSResponseInfo.resolve(client, downloadItem, mediaTools.siteExtractor()).stream
             pendingStreamFromDialog = null
             validateStream(stream)
+            streamHeaders = stream.requestHeaders
+            lastResolvedStream = stream
             isLiveRecording = stream.isLive
             updateParts(stream)
             downloadItem.liveRecording = stream.isLive
@@ -571,7 +588,7 @@ class HLSDownloadJob(
     }
 
     // a stored download without the info we need to decide how to download it (e.g. older data)
-    private fun needsStreamInfo(): Boolean = downloadItem.duration == null
+    private fun needsStreamInfo(): Boolean = downloadItem.duration == null || downloadItem.sitePage
 
     private fun validateStream(stream: ResolvedHLSStream) {
         when (stream.encryption) {
@@ -614,7 +631,8 @@ class HLSDownloadJob(
         val merged = ArrayList<MediaSegment>(maxOf(newParts.size, currentParts.size))
         for (newPart in newParts) {
             val oldPart = oldPartsMap[newPart.getID()]
-            if (oldPart != null && !oldPart.isInit && oldPart.duration != newPart.duration) {
+            if (oldPart != null && !oldPart.isInit && (oldPart.duration != newPart.duration
+                        || oldPart.rangeStart != newPart.rangeStart || oldPart.rangeLength != newPart.rangeLength)) {
                 // inconsistencies found! reset the parts to the new one
                 setParts(newParts)
                 return
@@ -638,11 +656,14 @@ class HLSDownloadJob(
             while (isActive && isLiveRecording) {
                 delay(interval)
                 val stream = try {
-                    HLSResponseInfo.resolve(client, downloadItem).stream
+                    val previous = lastResolvedStream
+                    if (downloadItem.sitePage && previous != null) refreshLivePlaylists(previous)
+                    else HLSResponseInfo.resolve(client, downloadItem, mediaTools.siteExtractor()).stream
                 } catch (e: Exception) {
                     if (ExceptionUtils.isNormalCancellation(e)) throw e
                     continue // a missed refresh is fine; try again
                 }
+                lastResolvedStream = stream
                 partLock.withLock { updateParts(stream) }
                 createPartDownloaderList()
                 beginDownloadParts()
@@ -654,6 +675,16 @@ class HLSDownloadJob(
                 saveState()
             }
         }
+    }
+
+    /** A video page's live stream: re-read its playlists (running yt-dlp on the page every few seconds is too slow). */
+    private suspend fun refreshLivePlaylists(previous: ResolvedHLSStream): ResolvedHLSStream {
+        suspend fun refresh(track: ResolvedTrack, index: Int): ResolvedTrack {
+            val text = HLSResponseInfo.fetchPlaylist(client, downloadItem, track.playlistUrl, streamHeaders).second
+            val playlist = HLSStreamResolver.parseMedia(text)
+            return ResolvedTrack(track.playlistUrl, playlist, HLSStreamResolver.toParts(playlist, track.playlistUrl, index))
+        }
+        return previous.copy(video = refresh(previous.video, 0), audio = previous.audio?.let { refresh(it, 1) })
     }
 
     /** "Stop" on a live recording: keep what was recorded and write the file. */
@@ -809,6 +840,8 @@ class HLSDownloadJob(
         if (config !is HLSDownloadJobExtraConfig) return
         config.stream?.let {
             pendingStreamFromDialog = it
+            streamHeaders = it.requestHeaders
+            lastResolvedStream = it
             if (parts.isEmpty()) {
                 isLiveRecording = it.isLive
                 downloadItem.liveRecording = it.isLive

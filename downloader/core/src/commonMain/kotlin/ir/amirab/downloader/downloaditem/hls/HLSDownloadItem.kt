@@ -36,6 +36,10 @@ data class HLSDownloadItem(
     // a live stream that was being recorded when last saved (e.g. the app closed while recording): on the next
     // start it can continue recording or be finished with what was recorded
     var liveRecording: Boolean = false,
+    override var sitePage: Boolean = false,
+    // cookies for the site extractor: in memory only, never written to the download list
+    @kotlinx.serialization.Transient
+    override var siteCookies: String? = null,
 ) : IDownloadItem, IHLSCredentials {
     override fun copy(
         id: Option<Long>,
@@ -123,6 +127,8 @@ data class HLSDownloadItem(
                 embeddedAudioPlaylist = credentials.embeddedAudioPlaylist,
                 displayQuality = credentials.displayQuality,
                 estimatedSize = credentials.estimatedSize,
+                sitePage = credentials.sitePage,
+                siteCookies = credentials.siteCookies,
                 id = id,
                 folder = folder,
                 name = name,
@@ -152,6 +158,8 @@ private fun HLSDownloadItem.withHlsCredentials(credentials: IHLSCredentials) = a
     embeddedAudioPlaylist = credentials.embeddedAudioPlaylist
     displayQuality = credentials.displayQuality
     estimatedSize = credentials.estimatedSize
+    sitePage = credentials.sitePage
+    siteCookies = credentials.siteCookies
 }
 
 fun HLSDownloadItem.applyFrom(other: HLSDownloadItem) {
@@ -182,4 +190,6 @@ fun HLSDownloadItem.applyFrom(other: HLSDownloadItem) {
     speedLimit = other.speedLimit
 
     fileChecksum = other.fileChecksum
+    sitePage = other.sitePage
+    siteCookies = other.siteCookies
 }

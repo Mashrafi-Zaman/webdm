@@ -254,11 +254,14 @@ class HLSNewDownloadInputs(
         val c = credentials.value
         val parts = mutableListOf(formatDuration(downloadSize.duration))
         (stream?.selectedVariant?.label ?: c.displayQuality)?.let { parts += it }
-        stream?.let { parts += "${it.mediaSegmentCount} segments" }
-        c.estimatedSize?.takeIf { it > 0 }?.let { size ->
-            convertPositiveBytesToHumanReadable(size, sizeAndSpeedUnitProvider.sizeUnit.value)?.let { parts += "~$it" }
+        // a video site's files are byte-range parts of whole files: their count means nothing to the user
+        if (!c.sitePage) stream?.let { parts += "${it.mediaSegmentCount} segments" }
+        val exactSize = stream?.knownSize
+        (exactSize ?: c.estimatedSize)?.takeIf { it > 0 }?.let { size ->
+            convertPositiveBytesToHumanReadable(size, sizeAndSpeedUnitProvider.sizeUnit.value)
+                ?.let { parts += if (exactSize != null) it else "~$it" }
         }
-        if (stream?.audio != null) parts += "separate audio"
+        if (stream?.audio != null) parts += if (c.sitePage) "video + audio" else "separate audio"
         if (stream?.encryption == HLSEncryption.Aes128) parts += "AES-128"
         if (stream?.isLive == true) parts += "live (records until you stop it)"
         return parts.joinToString(" - ").asStringSource()

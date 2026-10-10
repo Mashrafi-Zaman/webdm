@@ -77,6 +77,45 @@ data class AvDownloadCredentialsFromIntegration(
     val quality: String? = null,
 ) : IDownloadCredentialsFromIntegration
 
+/**
+ * A video page (YouTube, Facebook ...): only its URL; the app reads it with yt-dlp, lets the user pick a quality
+ * and downloads/merges the video itself. [cookies] (that site's browser cookies) are only sent when the app's
+ * capabilities say "page.cookies" (Settings > Tools > "Use browser cookies"), and only used to read the page.
+ */
+@SerialName("page")
+@Serializable
+data class PageDownloadCredentialsFromIntegration(
+    override val link: String,
+    val headers: Map<String, String>? = null,
+    override val downloadPage: String? = null,
+    override val suggestedName: String? = null,
+    val cookies: List<IntegrationCookie>? = null,
+) : IDownloadCredentialsFromIntegration
+
+@Serializable
+data class IntegrationCookie(
+    val name: String,
+    val value: String,
+    val domain: String,
+    val path: String = "/",
+    val secure: Boolean = false,
+    val httpOnly: Boolean = false,
+    // seconds since the epoch; null = session cookie
+    val expirationDate: Double? = null,
+) {
+    /** a line of a Netscape cookies.txt file (what yt-dlp reads) */
+    fun toNetscapeLine(): String {
+        val includeSubdomains = domain.startsWith(".")
+        val expires = expirationDate?.toLong() ?: 0L
+        val prefix = if (httpOnly) "#HttpOnly_" else ""
+        val clean = { s: String -> s.replace("\t", " ").replace("\n", " ").replace("\r", " ") }
+        return listOf(
+            prefix + clean(domain), if (includeSubdomains) "TRUE" else "FALSE", clean(path),
+            if (secure) "TRUE" else "FALSE", expires.toString(), clean(name), clean(value),
+        ).joinToString("\t")
+    }
+}
+
 @Serializable
 data class AddDownloadOptionsFromIntegration(
     val silentAdd: Boolean = false,

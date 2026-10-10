@@ -291,7 +291,55 @@ val downloadBundledFfmpeg = tasks.register("downloadBundledFfmpeg") {
         zip.delete()
     }
 }
-tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(downloadBundledFfmpeg) }
+// yt-dlp (Unlicense) reads video pages (YouTube, Facebook ...): resources/windows/tools/yt-dlp, checked against the
+// release's SHA2-256SUMS. Users can update it from Settings > Tools.
+val bundledYtDlpRelease = "https://github.com/yt-dlp/yt-dlp/releases/latest/download"
+val bundledYtDlpDir = project.layout.projectDirectory.dir("resources/windows/tools/yt-dlp")
+val downloadBundledYtDlp = tasks.register("downloadBundledYtDlp") {
+    description = "Downloads the yt-dlp.exe that is packaged with the app"
+    val outDir = bundledYtDlpDir.asFile
+    outputs.dir(outDir)
+    onlyIf { !outDir.resolve("yt-dlp.exe").isFile }
+    doLast {
+        fun open(url: String) = URI(url).toURL().openConnection().apply {
+            connectTimeout = 30_000
+            readTimeout = 120_000
+        }.getInputStream()
+        val expected = open("$bundledYtDlpRelease/SHA2-256SUMS").bufferedReader().use { it.readText() }
+            .lineSequence()
+            .map { it.trim().split(Regex("\\s+")) }
+            .firstOrNull { it.size == 2 && it[1].removePrefix("*") == "yt-dlp.exe" }
+            ?.get(0)?.lowercase()
+            ?: error("yt-dlp.exe is not listed in SHA2-256SUMS")
+        outDir.deleteRecursively()
+        outDir.mkdirs()
+        val exe = outDir.resolve("yt-dlp.exe")
+        val digest = MessageDigest.getInstance("SHA-256")
+        open("$bundledYtDlpRelease/yt-dlp.exe").use { input ->
+            exe.outputStream().use { output ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    output.write(buffer, 0, n)
+                    digest.update(buffer, 0, n)
+                }
+            }
+        }
+        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        if (actual != expected) {
+            outDir.deleteRecursively()
+            error("checksum mismatch for yt-dlp.exe")
+        }
+        outDir.resolve("LICENSE.txt").writeText(
+            open("https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/LICENSE").bufferedReader().use { it.readText() }
+        )
+        outDir.resolve("SOURCE.txt").writeText(
+            "yt-dlp from $bundledYtDlpRelease/yt-dlp.exe\nsha256 $actual\nSource code: https://github.com/yt-dlp/yt-dlp\n"
+        )
+    }
+}
+tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(downloadBundledFfmpeg, downloadBundledYtDlp) }
 // ======= end of bundled tools
 
 val postReleaseDistributable = tasks.register("postReleaseDistributable") {

@@ -19,6 +19,9 @@ interface HLSMediaTools {
         override fun ffmpegPath(): File? = null
         override fun convertTsToMp4(): Boolean = false
     }
+
+    /** extractor for video pages (YouTube, Facebook ...): yt-dlp; null if not available */
+    fun siteExtractor(): SiteMediaExtractor? = null
 }
 
 class FfmpegMissingException(what: String) :

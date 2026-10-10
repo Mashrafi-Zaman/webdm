@@ -18,7 +18,7 @@ data class HLSResponseInfo(
     val hlsManifest: MediaPlaylist get() = stream.video.playlist
 
     val name: String?
-        get() = httpResponseInfo?.fileName
+        get() = stream.title ?: httpResponseInfo?.fileName
     val duration = stream.duration.takeIf { it > 0 }
 
     override val isSuccessFul: Boolean
@@ -35,8 +35,26 @@ data class HLSResponseInfo(
         get() = httpResponseInfo?.unsuccessFullException
 
     companion object {
-        /** Fetch (or read the embedded) playlist(s) and resolve the stream, with the item's headers/cookies/UA. */
-        suspend fun resolve(client: HttpDownloaderClient, credentials: IHLSCredentials): HLSResponseInfo {
+        /**
+         * Fetch (or read the embedded) playlist(s) and resolve the stream, with the item's headers/cookies/UA.
+         * Video pages ([IHLSCredentials.sitePage]) are described by [siteExtractor] (yt-dlp) first.
+         */
+        suspend fun resolve(
+            client: HttpDownloaderClient,
+            credentials: IHLSCredentials,
+            siteExtractor: SiteMediaExtractor? = null,
+        ): HLSResponseInfo {
+            if (credentials.sitePage) {
+                val extractor = siteExtractor
+                    ?: throw SiteNotSupportedException("Downloading from video sites needs yt-dlp (Settings > Tools)")
+                val stream = HLSSiteResolver.resolve(
+                    credentials = credentials,
+                    extractor = extractor,
+                    fetch = { url, extra -> fetchPlaylist(client, credentials, url, extra).second },
+                    probeSize = { url, extra -> probeSize(client, credentials, url, extra) },
+                )
+                return HLSResponseInfo(null, stream)
+            }
             var firstResponse: HttpResponseInfo? = null
             val stream = HLSStreamResolver.resolve(credentials) { url ->
                 val (response, text) = fetchPlaylist(client, credentials, url)
@@ -46,14 +64,35 @@ data class HLSResponseInfo(
             return HLSResponseInfo(firstResponse, stream)
         }
 
+        /** full size of a file if its server answers Range requests (206), else null */
+        private suspend fun probeSize(
+            client: HttpDownloaderClient,
+            credentials: IHLSCredentials,
+            url: String,
+            extraHeaders: Map<String, String>,
+        ): Long? = runCatching {
+            val request = HttpDownloadCredentials(
+                link = url,
+                headers = credentials.headers.orEmpty().filterKeys { !it.equals("Range", true) } + extraHeaders,
+                username = credentials.username,
+                password = credentials.password,
+                downloadPage = credentials.downloadPage,
+                userAgent = credentials.userAgent,
+            )
+            client.connect(request, 0, 0).use { connection ->
+                connection.responseInfo.takeIf { it.statusCode == 206 }?.totalLength?.takeIf { it > 0 }
+            }
+        }.getOrNull()
+
         suspend fun fetchPlaylist(
             client: HttpDownloaderClient,
             credentials: IHLSCredentials,
             url: String,
+            extraHeaders: Map<String, String> = emptyMap(),
         ): Pair<HttpResponseInfo, String> {
             val request = HttpDownloadCredentials(
                 link = url,
-                headers = credentials.headers,
+                headers = credentials.headers.orEmpty() + extraHeaders,
                 username = credentials.username,
                 password = credentials.password,
                 downloadPage = credentials.downloadPage,
