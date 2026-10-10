@@ -69,7 +69,7 @@ jobs:
           path: build/ci-release
 
   extension:
-    name: Extension (Chromium zip + Chrome Web Store zip)
+    name: Extension (Chromium zip)
     runs-on: windows-2022
     steps:
       - name: Checkout webdm-extension
@@ -94,15 +94,12 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"; else v="$(node -p "require('./package.json').version")-dev"; fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
-      # YouTube support on (unpacked install); Chrome Web Store build: YouTube off and no pinned "key"
       - name: Build
         shell: bash
         run: |
-          npm run pack:chrome-store
           npm run pack:chrome
           mkdir -p out
           cp dist/chrome.zip "out/WebDM_Extension_${{ steps.version.outputs.version }}_chromium.zip"
-          cp dist/chrome-store.zip "out/WebDM_Extension_${{ steps.version.outputs.version }}_chrome-web-store.zip"
           ls -la out
 
       - name: Upload extension

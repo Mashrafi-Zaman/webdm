@@ -1,19 +1,13 @@
 package com.abdownloadmanager.desktop.actions
 
 import com.abdownloadmanager.desktop.AppComponent
-import com.abdownloadmanager.shared.util.SharedConstants
 import com.abdownloadmanager.desktop.di.Di
 import com.abdownloadmanager.shared.util.ui.icon.MyIcons
 import com.abdownloadmanager.desktop.utils.AppInfo
 import com.abdownloadmanager.desktop.utils.DesktopEntryCreator
 import com.abdownloadmanager.desktop.utils.isAppInstalled
-import com.abdownloadmanager.desktop.window.Browser
-import ir.amirab.util.compose.action.MenuItem
-import ir.amirab.util.compose.action.buildMenu
 import ir.amirab.util.compose.action.simpleAction
 import ir.amirab.util.compose.action.toggleableAction
-import com.abdownloadmanager.shared.util.getIcon
-import com.abdownloadmanager.shared.util.getName
 import com.abdownloadmanager.resources.Res
 import com.abdownloadmanager.shared.action.createCheckForUpdateAction
 import com.abdownloadmanager.shared.action.createDownloadFromClipboardAction
@@ -31,7 +25,6 @@ import com.abdownloadmanager.shared.action.createStartQueueGroupAction
 import com.abdownloadmanager.shared.action.createStopQueueGroupAction
 import com.abdownloadmanager.shared.action.createUseSpeedLimiterAction
 import ir.amirab.downloader.queue.activeQueuesFlow
-import ir.amirab.util.URLOpener
 import ir.amirab.util.compose.asStringSource
 import ir.amirab.util.desktop.PlatformAppActivator
 import kotlinx.coroutines.CoroutineScope
@@ -69,25 +62,6 @@ val showDownloadList = simpleAction(
     PlatformAppActivator.active()
     appComponent.openHome()
 }
-val browserIntegrations = MenuItem.SubMenu(
-    title = Res.string.download_browser_integration.asStringSource(),
-    icon = MyIcons.download,
-    items = buildMenu {
-        for (browserExtension in SharedConstants.browserIntegrations) {
-            item(
-                title = browserExtension.type.getName().asStringSource(),
-                icon = browserExtension.type.getIcon(),
-                onClick = {
-                    val browser = Browser.getBrowserByType(browserExtension.type)
-                    val success = browser?.openLink(browserExtension.url) == true
-                    if (!success) {
-                        URLOpener.openUrl(browserExtension.url)
-                    }
-                }
-            )
-        }
-    }
-)
 
 
 // commonUsage but with desktop implementations
