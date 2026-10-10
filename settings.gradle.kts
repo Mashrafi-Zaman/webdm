@@ -15,7 +15,11 @@ dependencyResolutionManagement {
 
 rootProject.name = "WebDM"
 
-include("android:app")
+// WebDM targets Windows x64: the Android app is only part of the build with SKIP_ANDROID_BUILD=false (it needs an
+// Android SDK; without this, tasks like "test" fail on machines that have none)
+if (System.getenv("SKIP_ANDROID_BUILD")?.toBoolean() == false) {
+    include("android:app")
+}
 include("desktop:app")
 include("desktop:app-utils")
 include("desktop:shared")

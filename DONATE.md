@@ -1,5 +1,6 @@
 # ❤️ Donate
 
-This app is completely free, contains no ads, respects your privacy, and is open source. Its development and maintenance require significant time and effort. Your support helps keep the project alive and continuously improving.
+WebDM is free, contains no ads, respects your privacy, and is open source. It has no donation channel of its own.
 
-Please visit https://abdownloadmanager.com/donate to view the available ways to support the project.
+WebDM is built on [AB Download Manager](https://github.com/amir1376/ab-download-manager); if you'd like to support
+the original project, see https://abdownloadmanager.com/donate.
