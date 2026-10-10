@@ -1,10 +1,8 @@
 package ir.amirab.downloader.downloaditem.hls
 
-import io.lindstrom.m3u8.model.MediaPlaylist
 import ir.amirab.downloader.DownloadManager
 import ir.amirab.downloader.connection.HttpDownloaderClient
 import ir.amirab.downloader.destination.DownloadDestination
-import ir.amirab.downloader.destination.SegmentedDownloadDestination
 import ir.amirab.downloader.downloaditem.DownloadJob
 import ir.amirab.downloader.downloaditem.DownloadJobExtraConfig
 import ir.amirab.downloader.downloaditem.DownloadJobStatus
@@ -13,6 +11,7 @@ import ir.amirab.downloader.downloaditem.IDownloadItem
 import ir.amirab.downloader.exception.DownloadValidationException
 import ir.amirab.downloader.exception.TooManyErrorException
 import ir.amirab.downloader.part.*
+import kotlinx.coroutines.currentCoroutineContext
 import ir.amirab.downloader.utils.*
 import ir.amirab.downloader.utils.speedlimiter.SpeedLimiter
 import ir.amirab.util.tryLocked
@@ -34,6 +33,7 @@ class HLSDownloadJob(
     override val downloadItem: HLSDownloadItem,
     downloadManager: DownloadManager,
     val client: HttpDownloaderClient,
+    private val mediaTools: HLSMediaTools = HLSMediaTools.None,
 ) : DownloadJob(
     downloadManager = downloadManager,
 ) {
@@ -41,7 +41,21 @@ class HLSDownloadJob(
     val partListDb by downloadManager::partListDb
     private val parts: MutableList<MediaSegment> = mutableListOf()
 
-    private lateinit var destination: SegmentedDownloadDestination
+    private lateinit var destination: HLSDownloadDestination
+
+    // AES-128 keys, fetched with the item's headers/cookies
+    private val keyProvider = HLSKeyProvider(client) { downloadItem }
+
+    // live stream (no EXT-X-ENDLIST): keep polling the playlist and record until the user stops
+    @Volatile
+    var isLiveRecording = false
+        private set
+
+    // number of media segments (without init segments), for the progress window
+    fun getSegmentProgress(): Pair<Int, Int> {
+        val media = getParts().filter { !it.isInit }
+        return media.count { it.isCompleted } to media.size
+    }
 
     override fun getDestination(): DownloadDestination {
         return destination
@@ -59,16 +73,13 @@ class HLSDownloadJob(
 
     override fun initializeDestination() {
         val outFile = downloadManager.calculateOutputFile(downloadItem)
-        destination = SegmentedDownloadDestination(
+        destination = HLSDownloadDestination(
             outputFile = outFile,
             getAllParts = {
                 getParts()
             },
             tempDirectory = downloadManager.downloadDataFolder.resolve(id.toString()),
-            getFileName = {
-                it.getID().toString()
-            },
-            appendMode = false,
+            mediaTools = mediaTools,
         )
     }
 
@@ -101,6 +112,7 @@ class HLSDownloadJob(
         downloadItem.startTime = null
         downloadItem.completeTime = null
         downloadItem.duration = null
+        isLiveRecording = false
         downloadedSizeBeforeRetry = 0 // nothing
         saveState()
         downloadManager.onDownloadItemChange(downloadItem)
@@ -137,13 +149,18 @@ class HLSDownloadJob(
             boot()
             // if download item is booted and parts is not empty it means that we resumed that file in some point
             // but we should check if all parts are already downloaded to finish the job before hitting the server unnecessarily!
-            if (parts.isNotEmpty() && parts.all { it.isCompleted }) {
+            if (parts.isNotEmpty() && parts.all { it.isCompleted } && !isLiveRecording) {
                 onDownloadFinished()
                 return@launch
             }
             onDownloadResuming()
             try {
-                fetchDownloadInfoAndValidate()
+                val stream = fetchDownloadInfoAndValidate()
+                if (stream?.encryption == HLSEncryption.SampleAes) {
+                    // SAMPLE-AES: WebDM doesn't decrypt it itself; ffmpeg does (stream copy)
+                    downloadWithFfmpeg(stream)
+                    return@launch
+                }
                 createPartDownloaderList()
 //                println("part downloaders created")
                 beginDownloadParts()
@@ -154,6 +171,9 @@ class HLSDownloadJob(
                 }
                 saveState()
                 onDownloadResumed()
+                if (isLiveRecording) {
+                    startLivePlaylistPolling(stream?.video?.playlist?.targetDuration() ?: 6)
+                }
             } catch (e: Exception) {
                 e.printStackIfNOtUsual()
                 val shouldStop = when {
@@ -426,7 +446,7 @@ class HLSDownloadJob(
 
             PartDownloadStatus.Completed -> {
                 destination.onPartCancelled(partDownloader.part)
-                if (getParts().all { it.isCompleted }) {
+                if (getParts().all { it.isCompleted } && !isLiveRecording) {
                     onDownloadFinished()
                 } else {
                     scope.launch {
@@ -484,6 +504,8 @@ class HLSDownloadJob(
                         downloadManager.speedLimiter,
                         speedLimiter,
                     ),
+                    credentials = { downloadItem },
+                    keyProvider = keyProvider,
                 ).also { partDownloader: HLSPartDownloader ->
                     partDownloader.onTooManyErrors = {
                         onPartHaveToManyError(it)
@@ -503,10 +525,18 @@ class HLSDownloadJob(
         partDownloaderList.remove(part.getID())
     }
 
-    private suspend fun fetchDownloadInfoAndValidate(
-    ) {
-        if (parts.isEmpty()) {
-            initialParts()
+    // the stream checked by the add-download dialog (saves fetching the playlists twice)
+    private var pendingStreamFromDialog: ResolvedHLSStream? = null
+
+    private suspend fun fetchDownloadInfoAndValidate(): ResolvedHLSStream? {
+        var stream: ResolvedHLSStream? = null
+        if (parts.isEmpty() || isLiveRecording || needsStreamInfo()) {
+            stream = pendingStreamFromDialog?.takeIf { parts.isEmpty() }
+                ?: HLSResponseInfo.resolve(client, downloadItem).stream
+            pendingStreamFromDialog = null
+            validateStream(stream)
+            isLiveRecording = stream.isLive
+            updateParts(stream)
         }
         // at this point we have all the parts we need either by hitting remote or they are already in destination
         // before proceed we should check the downloaded parts and remove the "isCompleted" flag if they are missing
@@ -520,60 +550,131 @@ class HLSDownloadJob(
             }
 
         saveState()
+        return stream
     }
 
-    // new segments received
-    // we should compare those and update them
-    // we reset the whole if we found different duration
-    fun updateParts(
-        playlist: MediaPlaylist
-    ) {
-        val newParts = playlist.mediaSegments()
-            .mapIndexed { index, segment ->
-                MediaSegment(
-                    segmentIndex = playlist.mediaSequence() + index,
-                    link = segment.uri(),
-                    duration = segment.duration()
-                )
+    // a stored download without the info we need to decide how to download it (e.g. older data)
+    private fun needsStreamInfo(): Boolean = downloadItem.duration == null
+
+    private fun validateStream(stream: ResolvedHLSStream) {
+        when (stream.encryption) {
+            HLSEncryption.Drm -> throw DrmProtectedStreamException()
+            HLSEncryption.SampleAes -> if (mediaTools.ffmpegPath() == null) {
+                throw UnsupportedStreamException("SAMPLE-AES encrypted video is not supported without ffmpeg (Settings > Tools)")
             }
-        val currentParts = parts
-        downloadItem.duration = newParts.sumOf { it.duration }
+
+            else -> {}
+        }
+        val outputIsMp4 = destination.outputFile.extension.equals("mp4", ignoreCase = true)
+        if (stream.audio != null && mediaTools.ffmpegPath() == null) {
+            throw FfmpegMissingException("A video with a separate audio track")
+        }
+        if (stream.format == HLSSegmentFormat.Ts && stream.audio == null && outputIsMp4 && mediaTools.ffmpegPath() == null) {
+            throw FfmpegMissingException("Saving an MPEG-TS stream as .mp4")
+        }
+    }
+
+    /**
+     * New playlist data: keep the completion state of parts we already have (same id = same track, sequence and
+     * kind) and add new ones (live streams). If a segment changed its duration the stream changed: start over.
+     */
+    fun updateParts(stream: ResolvedHLSStream) {
+        val newParts = stream.allParts
+        downloadItem.duration = stream.duration
+        val currentParts = parts.toList()
         if (currentParts.isEmpty()) {
             setParts(newParts)
             return
         }
-        val oldPartsMap = currentParts.associateBy {
-            it.segmentIndex
-        }
-        val newPartsToSave = ArrayList<MediaSegment>(newParts.size)
+        val oldPartsMap = currentParts.associateBy { it.getID() }
+        val merged = ArrayList<MediaSegment>(maxOf(newParts.size, currentParts.size))
         for (newPart in newParts) {
-            val oldPart = oldPartsMap[newPart.segmentIndex]
-            var newPartToAdd = newPart
-            if (oldPart != null) {
-                if (oldPart.duration == newPart.duration) {
-                    newPartToAdd = newPart.copy(
-                        isCompleted = oldPart.isCompleted
-                    )
-                } else {
-                    // inconsistencies found! reset the parts to the new one
-                    setParts(newParts)
-                    return
-                }
+            val oldPart = oldPartsMap[newPart.getID()]
+            if (oldPart != null && !oldPart.isInit && oldPart.duration != newPart.duration) {
+                // inconsistencies found! reset the parts to the new one
+                setParts(newParts)
+                return
             }
-            newPartsToSave.add(newPartToAdd)
+            merged.add(
+                if (oldPart != null) newPart.copy(isCompleted = oldPart.isCompleted, length = oldPart.length) else newPart
+            )
+        }
+        if (stream.isLive) {
+            // a live playlist only lists recent segments: keep the recorded ones that already left it
+            val newIds = newParts.map { it.getID() }.toHashSet()
+            merged.addAll(currentParts.filter { it.getID() !in newIds && it.isCompleted })
+        }
+        setParts(merged.sortedBy { it.getID() })
+    }
+
+    private fun startLivePlaylistPolling(targetDurationSeconds: Int) {
+        activeDownloadScope?.launch {
+            val interval = (targetDurationSeconds * 1000L).coerceIn(2_000L, 10_000L)
+            while (isActive && isLiveRecording) {
+                delay(interval)
+                val stream = try {
+                    HLSResponseInfo.resolve(client, downloadItem).stream
+                } catch (e: Exception) {
+                    if (ExceptionUtils.isNormalCancellation(e)) throw e
+                    continue // a missed refresh is fine; try again
+                }
+                partLock.withLock { updateParts(stream) }
+                createPartDownloaderList()
+                beginDownloadParts()
+                if (!stream.isLive) {
+                    // the stream ended (EXT-X-ENDLIST appeared)
+                    isLiveRecording = false
+                    if (getParts().all { it.isCompleted }) onDownloadFinished()
+                }
+                saveState()
+            }
         }
     }
 
-    private suspend fun initialParts(): HLSResponseInfo {
-        val response = client.connect(
-            downloadItem, null, null
-        ).use {
-            HLSResponseInfo.fromConnection(it)
+    /** "Stop" on a live recording: keep what was recorded and write the file. */
+    private suspend fun finishLiveRecording() {
+        isLiveRecording = false
+        clearPartDownloaderList()
+        setParts(getParts().filter { it.isCompleted })
+        saveState()
+        onDownloadFinished()
+    }
+
+    private suspend fun downloadWithFfmpeg(stream: ResolvedHLSStream) {
+        val ffmpeg = mediaTools.ffmpegPath()
+            ?: throw UnsupportedStreamException("SAMPLE-AES encrypted video is not supported without ffmpeg")
+        downloadItem.status = DownloadStatus.Downloading
+        if (downloadItem.startTime == null) downloadItem.startTime = System.currentTimeMillis()
+        saveState()
+        onDownloadResumed()
+        val output = destination.outputFile
+        output.parentFile?.mkdirs()
+        val inputs = buildList {
+            addAll(Ffmpeg.headerArgs(downloadItem.headers, downloadItem.userAgent))
+            addAll(listOf("-i", stream.video.playlistUrl))
+            stream.audio?.let {
+                addAll(Ffmpeg.headerArgs(downloadItem.headers, downloadItem.userAgent))
+                addAll(listOf("-i", it.playlistUrl))
+            }
         }
-        updateParts(
-            response.hlsManifest
-        )
-        return response
+        val maps = if (stream.audio != null) listOf("-map", "0:v:0?", "-map", "1:a:0") else listOf("-map", "0")
+        val total = stream.duration.takeIf { it > 0 }
+        val scopeJob = currentCoroutineContext().job
+        withContext(Dispatchers.IO) {
+            Ffmpeg.run(
+                ffmpeg,
+                inputs + maps + listOf("-c", "copy", output.absolutePath),
+                onProgress = { seconds ->
+                    total?.let {
+                        _status.value = DownloadJobStatus.PreparingFile((seconds * 100 / it).toInt().coerceIn(0, 99))
+                    }
+                },
+                isCancelled = { !scopeJob.isActive },
+            )
+        }
+        // ffmpeg wrote the whole file: nothing left to download or assemble
+        setParts(getParts().map { it.copy(isCompleted = true) })
+        onDownloadFinished()
     }
 
     suspend fun cancelDownloadScope() {
@@ -603,6 +704,11 @@ class HLSDownloadJob(
         cancelRetry()
         cancelDownloadScope()
         stopAllParts()
+        if (isLiveRecording && ExceptionUtils.isNormalCancellation(throwable) && getParts().any { it.isCompleted }) {
+            // user pressed stop on a live recording: write what was recorded
+            finishLiveRecording()
+            return
+        }
         onDownloadCanceled(throwable)
     }
 
@@ -650,9 +756,13 @@ class HLSDownloadJob(
 
     override suspend fun extraConfigsReceived(config: DownloadJobExtraConfig) {
         if (config !is HLSDownloadJobExtraConfig) return
-        config.hlsManifest?.let {
-            updateParts(it)
-            saveParts()
+        config.stream?.let {
+            pendingStreamFromDialog = it
+            if (parts.isEmpty()) {
+                isLiveRecording = it.isLive
+                updateParts(it)
+                saveParts()
+            }
         }
     }
 }

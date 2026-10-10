@@ -87,6 +87,8 @@ import org.koin.core.context.startKoin
 import org.koin.dsl.bind
 import org.koin.dsl.module
 import com.abdownloadmanager.updatechecker.GithubUpdateChecker
+import com.abdownloadmanager.desktop.tools.FfmpegManager
+import ir.amirab.downloader.downloaditem.hls.HLSMediaTools
 import com.abdownloadmanager.updatechecker.UpdateChecker
 import ir.amirab.util.AppVersionTracker
 import com.abdownloadmanager.shared.util.appinfo.PreviousVersion
@@ -225,8 +227,12 @@ val downloaderModule = module {
             useSparseFile = { downloadSettings.useSparseFileAllocation }
         )
     }
+    // ffmpeg (Settings > Tools); also the HLS downloader's media tools
     single {
-        HLSDownloader(inject())
+        FfmpegManager(scope = get())
+    }.bind<HLSMediaTools>()
+    single {
+        HLSDownloader(inject(), get())
     }
     single {
         HLSDownloaderInUi(get(), get())

@@ -35,8 +35,8 @@ paths:
                           Kind of download; "hls" for HLS (.m3u8) playlists; "segments" for a stream the
                           extension rebuilt from its numbered fMP4/TS segments because no manifest was found
                           (download init + segments in order into ONE file; see init/segments below).
-                          NOTE: "segments" is sent by the extension since Prompt 8b; the app accepts it from
-                          Prompt 9 on (older apps reject the request).
+                          Clients must check GET /capabilities first and only send types listed in jobTypes
+                          (apps without /capabilities don't support "segments").
                       link:
                         type: string
                         description: The link to the download source
@@ -78,6 +78,19 @@ paths:
                         description: >
                           type "segments" only, optional - segments of a separate audio track, in order;
                           downloaded the same way, then merged with the video into one .mp4 (ffmpeg stream copy)
+                      duration:
+                        type: number
+                        nullable: true
+                        description: type "segments" only, optional - total duration in seconds (shown in the dialog)
+                      estimatedSize:
+                        type: integer
+                        format: int64
+                        nullable: true
+                        description: type "segments" only, optional - estimated total size in bytes
+                      quality:
+                        type: string
+                        nullable: true
+                        description: type "segments" only, optional - quality label shown in the dialog, e.g. "1080p"
                 options:
                   type: object
                   description: Optional; all fields default to false
@@ -130,6 +143,41 @@ paths:
               schema:
                 type: string
                 description: OK on success
+
+  /capabilities:
+    get:
+      summary: What this app can download
+      description: >
+        Lets clients (the browser extension) avoid sending jobs the app doesn't understand. Also available
+        over native messaging as the "capabilities" action (there "ffmpeg" is not reported). Older apps
+        answer 404.
+      responses:
+        "200":
+          description: Capabilities of this app
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ app, version, jobTypes, features ]
+                properties:
+                  app:
+                    type: string
+                    example: Web Download Manager
+                  version:
+                    type: string
+                  jobTypes:
+                    type: array
+                    items:
+                      type: string
+                    description: /add item types accepted
+                    example: [ http, hls, segments ]
+                  features:
+                    type: object
+                    additionalProperties:
+                      type: boolean
+                    description: >
+                      hls.masterPlaylists, hls.aes128, hls.fmp4, hls.byteRange, hls.discontinuity, hls.live,
+                      and ffmpeg (installed right now; needed for separate audio tracks, SAMPLE-AES and .ts -> .mp4)
 
   /queues:
     get:

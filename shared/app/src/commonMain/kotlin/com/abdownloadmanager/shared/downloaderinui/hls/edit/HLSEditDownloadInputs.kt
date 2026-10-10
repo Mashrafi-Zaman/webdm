@@ -182,7 +182,7 @@ class HLSEditDownloadInputs(
     val duration = linkChecker.duration
     override val downloadJobConfig: StateFlow<DownloadJobExtraConfig?> = linkChecker.responseInfo.mapStateFlow {
         it?.let {
-            HLSDownloadJobExtraConfig(it.hlsManifest)
+            HLSDownloadJobExtraConfig(stream = it.stream)
         }
     }
 

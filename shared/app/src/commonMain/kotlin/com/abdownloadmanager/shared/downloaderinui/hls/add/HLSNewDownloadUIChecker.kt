@@ -24,4 +24,11 @@ class HLSNewDownloadUIChecker(
     downloadSystem = downloadSystem,
     scope = scope,
 ) {
+    init {
+        // keep the name the download came with (e.g. from the browser extension)
+        linkChecker.preferredName = initialName.takeIf { it.isNotBlank() }
+    }
+
+    /** master playlists: qualities to choose from (best first) */
+    val variants = linkChecker.variants
 }

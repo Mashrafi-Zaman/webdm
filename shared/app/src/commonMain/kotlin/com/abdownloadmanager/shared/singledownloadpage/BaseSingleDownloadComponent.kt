@@ -307,6 +307,15 @@ abstract class BaseSingleDownloadComponent<
                                 ?: Res.string.unknown.asStringSource()
                         )
                     )
+                    if (it.segmentsTotal > 0) {
+                        add(
+                            SingleDownloadPagePropertyItem(
+                                "Segments".asStringSource(),
+                                ("${it.segmentsDone} / ${it.segmentsTotal}" +
+                                        if (it.isLive) " (live: recording until you stop it)" else "").asStringSource()
+                            )
+                        )
+                    }
                 } else {
                     add(
                         SingleDownloadPagePropertyItem(

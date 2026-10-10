@@ -99,7 +99,8 @@ class HLSDownloaderInUi(
     override fun createLinkChecker(initialCredentials: HLSDownloadCredentials): HLSLinkChecker {
         return HLSLinkChecker(
             credentials = initialCredentials,
-            client = downloader.client
+            client = downloader.client,
+            mediaTools = downloader.mediaTools,
         )
     }
 

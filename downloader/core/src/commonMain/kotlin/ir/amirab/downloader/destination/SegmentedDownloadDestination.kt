@@ -7,7 +7,7 @@ import okio.FileSystem
 import okio.Path.Companion.toOkioPath
 import java.io.File
 
-class SegmentedDownloadDestination(
+open class SegmentedDownloadDestination(
     // a directory unique for this item!
     val tempDirectory: File,
     val getFileName: (DownloadPart) -> String,
@@ -78,6 +78,12 @@ class SegmentedDownloadDestination(
     }
 
     override fun onAllPartsCompleted(onProgressUpdate: (Int?) -> Unit) {
+        assembleOutput(onProgressUpdate)
+        super.onAllPartsCompleted(onProgressUpdate)
+    }
+
+    /** write the downloaded parts into [outputFile] (in id order) */
+    protected open fun assembleOutput(onProgressUpdate: (Int?) -> Unit) {
         assemble(
             getAllParts()
                 .sortedBy { it.getID() }
@@ -85,7 +91,6 @@ class SegmentedDownloadDestination(
             outputFile,
             onProgressUpdate
         )
-        super.onAllPartsCompleted(onProgressUpdate)
     }
 
     fun assemble(
@@ -93,7 +98,7 @@ class SegmentedDownloadDestination(
         destination: File,
         onProgress: (Int) -> Unit
     ) {
-        DownloadDestination.prepareDestinationFolder(outputFile)
+        DownloadDestination.prepareDestinationFolder(destination)
         val totalLength = sources.sumOf { it.length() }
         var totalWritten = 0L
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)

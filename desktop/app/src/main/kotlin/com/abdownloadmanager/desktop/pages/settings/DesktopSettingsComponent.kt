@@ -13,6 +13,11 @@ import com.abdownloadmanager.shared.settings.BaseSettingsComponent
 import com.abdownloadmanager.shared.settings.CommonSettings
 import com.abdownloadmanager.shared.storage.impl.DNSStorage
 import com.abdownloadmanager.shared.ui.configurable.ConfigurableGroup
+import com.abdownloadmanager.shared.ui.configurable.item.BooleanConfigurable
+import com.abdownloadmanager.shared.ui.configurable.item.NavigatableConfigurable
+import com.abdownloadmanager.shared.ui.configurable.item.StringConfigurable
+import com.abdownloadmanager.desktop.tools.FfmpegManager
+import ir.amirab.util.flow.createMutableStateFlowFromStateFlow
 import com.abdownloadmanager.shared.ui.theme.ThemeManager
 import com.abdownloadmanager.shared.util.proxy.ProxyManager
 import com.abdownloadmanager.shared.util.ui.icon.MyIcons
@@ -42,6 +47,10 @@ sealed class SettingSection(
 
     data object BrowserIntegration :
         SettingSection(MyIcons.network, Res.string.browser_integration.asStringSource())
+
+    // external tools (ffmpeg) used for some video downloads
+    data object Tools :
+        SettingSection(MyIcons.settings, "Tools".asStringSource())
 }
 
 interface SettingSectionGetter {
@@ -62,6 +71,7 @@ class DesktopSettingsComponent(
     private val languageManager by inject<LanguageManager>()
     private val fontManager by inject<FontManager>()
     private val customRenderApi by inject<CustomRenderApi>()
+    private val ffmpegManager by inject<FfmpegManager>()
     private val allConfigs = object : SettingSectionGetter {
         override operator fun get(key: SettingSection): List<ConfigurableGroup> {
             return when (key) {
@@ -134,6 +144,49 @@ class DesktopSettingsComponent(
                             CommonSettings.browserIntegrationPort(appRepository),
                             CommonSettings.apiAuthEnabled(appRepository),
                             CommonSettings.apiAuthKey(appRepository),
+                        )
+                    )
+                )
+
+                Tools -> listOf(
+                    ConfigurableGroup(
+                        nestedConfigurable = listOf(
+                            StringConfigurable(
+                                title = "ffmpeg".asStringSource(),
+                                description = ("Needed for videos with a separate audio track, SAMPLE-AES encrypted " +
+                                        "streams and converting .ts to .mp4. WebDM only copies streams with it " +
+                                        "(no re-encoding).").asStringSource(),
+                                backedBy = createMutableStateFlowFromStateFlow(
+                                    flow = ffmpegManager.status,
+                                    updater = {},
+                                    scope = scope,
+                                ),
+                                describe = { it.asStringSource() },
+                                enabled = MutableStateFlow(false),
+                            ),
+                            NavigatableConfigurable(
+                                title = "Download or update ffmpeg (LGPL)".asStringSource(),
+                                description = ("Downloads the LGPL Windows build from github.com/BtbN/FFmpeg-Builds, " +
+                                        "checks it against the release's SHA-256 checksums and installs it with its " +
+                                        "license into WebDM's tools folder.").asStringSource(),
+                                onRequestNavigate = { ffmpegManager.downloadOrUpdate() },
+                            ),
+                            NavigatableConfigurable(
+                                title = "Show ffmpeg license".asStringSource(),
+                                description = "Opens the license that came with the installed ffmpeg build (LGPL).".asStringSource(),
+                                onRequestNavigate = {
+                                    runCatching { java.awt.Desktop.getDesktop().open(ffmpegManager.licenseFile) }
+                                },
+                            ),
+                            BooleanConfigurable(
+                                title = "Convert .ts downloads to .mp4".asStringSource(),
+                                description = ("Save MPEG-TS video streams as .mp4 (stream copy, no re-encoding). " +
+                                        "Needs ffmpeg.").asStringSource(),
+                                backedBy = ffmpegManager.convertTsToMp4Setting,
+                                describe = {
+                                    if (it) Res.string.enabled.asStringSource() else Res.string.disabled.asStringSource()
+                                },
+                            ),
                         )
                     )
                 )
@@ -217,6 +270,7 @@ class DesktopSettingsComponent(
 //        Network,
         DownloadEngine,
         BrowserIntegration,
+        Tools,
     )
     private val _currentPage: MutableStateFlow<SettingSection> = MutableStateFlow(Appearance)
     val currentPage: StateFlow<SettingSection> = _currentPage.asStateFlow()

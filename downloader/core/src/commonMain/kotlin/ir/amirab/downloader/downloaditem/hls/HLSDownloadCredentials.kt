@@ -15,7 +15,12 @@ data class HLSDownloadCredentials(
     override val password: String? = null,
     override val userAgent: String? = null,
     override val link: String,
-    override val downloadPage: String? = null
+    override val downloadPage: String? = null,
+    override val selectedVariantUrl: String? = null,
+    override val embeddedPlaylist: String? = null,
+    override val embeddedAudioPlaylist: String? = null,
+    override val displayQuality: String? = null,
+    override val estimatedSize: Long? = null,
 ) : IHLSCredentials {
     override fun copy(
         link: Option<String>,
