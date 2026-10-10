@@ -184,6 +184,7 @@ installerPlugin {
         nsisTemplate = project.file("resources/installer/nsis-script-template.nsi")
         extraParams = mapOf(
             "native_messaging_host_binary_name" to nativeMessagingHostBinaryName,
+            "native_messaging_host_name" to getApplicationPackageName(),
             "cli_binary_name" to cliBinaryName,
             "app_publisher" to "WebDM",
             "app_version_with_build" to "${getAppVersionStringForPackaging(TargetFormat.Exe)}.0",

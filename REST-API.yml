@@ -215,6 +215,18 @@ paths:
                 type: string
                 description: OK on success
 
+  /ping:
+    post:
+      summary: Check that WebDM is running
+      description: The extension calls this to see if the app answers on the configured port.
+      responses:
+        "200":
+          description: The app is running
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: pong
   /capabilities:
     get:
       summary: What this app can download
@@ -283,7 +295,14 @@ paths:
               properties:
                 downloadSource:
                   type: object
+                  description: >
+                    Same item as in /add (type http, hls, segments, av or page with their fields); only the common
+                    fields are listed here
+                  required: [ type, link ]
                   properties:
+                    type:
+                      type: string
+                      enum: [ http, hls, segments, av, page ]
                     link:
                       type: string
                       description: The link to the download source

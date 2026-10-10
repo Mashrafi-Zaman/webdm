@@ -20,6 +20,8 @@ SetCompressor /SOLID lzma
 !define LICENSE_FILE "{{ license_file }}"
 !define MAIN_BINARY_NAME "${APP_NAME}"
 !define NATIVE_MESSAGING_HOST_BINARY_NAME "{{ native_messaging_host_binary_name }}"
+; the browser extension's native messaging host (the app registers it for Chrome/Edge/Brave when it starts)
+!define NATIVE_MESSAGING_HOST_NAME "{{ native_messaging_host_name }}"
 !define CLI_BINARY_NAME "{{ cli_binary_name }}"
 
 !define SIDEBAR_IMAGE "{{ sidebar_image_file }}"
@@ -27,7 +29,7 @@ SetCompressor /SOLID lzma
 !define ICON_FILE "{{ icon_file }}"
 
 !define REG_UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
-!define REG_RUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run\${APP_NAME}"
+!define REG_RUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run"
 !define REG_APP_KEY "Software\${APP_NAME}"
 
 ; icon for this installer!
@@ -234,6 +236,12 @@ Section "Uninstall"
     DeleteRegKey SHCTX "${REG_UNINSTALL_KEY}"
     DeleteRegKey SHCTX "${REG_APP_KEY}"
 
-    ; remove auto start on boot registry
-    DeleteRegValue SHCTX "${REG_RUN_KEY}" "${APP_NAME}"
+    ; remove auto start on boot: the app writes a value named after its display name under HKCU ...\Run
+    DeleteRegValue HKCU "${REG_RUN_KEY}" "${APP_DISPLAY_NAME}"
+
+    ; browser integration: the native messaging host registrations (Firefox: left by older WebDM versions)
+    DeleteRegKey HKCU "Software\Google\Chrome\NativeMessagingHosts\${NATIVE_MESSAGING_HOST_NAME}"
+    DeleteRegKey HKCU "Software\Microsoft\Edge\NativeMessagingHosts\${NATIVE_MESSAGING_HOST_NAME}"
+    DeleteRegKey HKCU "Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\${NATIVE_MESSAGING_HOST_NAME}"
+    DeleteRegKey HKCU "Software\Mozilla\NativeMessagingHosts\${NATIVE_MESSAGING_HOST_NAME}"
 SectionEnd
