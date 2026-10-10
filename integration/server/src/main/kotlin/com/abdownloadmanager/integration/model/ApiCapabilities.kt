@@ -16,7 +16,7 @@ data class ApiCapabilities(
     val features: Map<String, Boolean>,
 ) {
     companion object {
-        val JOB_TYPES = listOf("http", "hls", "segments")
+        val JOB_TYPES = listOf("http", "hls", "segments", "av")
 
         /** features that don't depend on installed tools */
         fun baseFeatures(): Map<String, Boolean> = mapOf(

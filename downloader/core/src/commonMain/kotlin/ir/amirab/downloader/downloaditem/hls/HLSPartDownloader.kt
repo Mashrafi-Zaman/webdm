@@ -60,7 +60,8 @@ class HLSPartDownloader(
         val connect = client.connect(
             HttpDownloadCredentials(
                 link = fullLink.toString(),
-                headers = c.headers,
+                // the part's own byte range decides what is requested, never a Range header from the browser
+                headers = c.headers?.filterKeys { !it.equals("Range", ignoreCase = true) && !it.equals("If-Range", ignoreCase = true) },
                 username = c.username,
                 password = c.password,
                 downloadPage = c.downloadPage,
@@ -75,6 +76,11 @@ class HLSPartDownloader(
         if (!connect.responseInfo.isSuccessFul) {
             connect.close()
             throw IOException("segment request failed: HTTP ${connect.responseInfo.statusCode}")
+        }
+        if (start != null && connect.responseInfo.statusCode != 206) {
+            // asked for a byte range but got something else (usually the whole file): writing it would corrupt the part
+            connect.close()
+            throw IOException("server ignored the byte range (HTTP ${connect.responseInfo.statusCode})")
         }
         rawBytesRead = 0
         expectedRawLength = connect.responseInfo.contentLength?.takeIf { it > 0 }

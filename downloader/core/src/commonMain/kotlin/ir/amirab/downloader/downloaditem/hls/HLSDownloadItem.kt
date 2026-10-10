@@ -33,6 +33,9 @@ data class HLSDownloadItem(
     override var embeddedAudioPlaylist: String? = null,
     override var displayQuality: String? = null,
     override var estimatedSize: Long? = null,
+    // a live stream that was being recorded when last saved (e.g. the app closed while recording): on the next
+    // start it can continue recording or be finished with what was recorded
+    var liveRecording: Boolean = false,
 ) : IDownloadItem, IHLSCredentials {
     override fun copy(
         id: Option<Long>,

@@ -139,6 +139,21 @@ class IntegrationHandlerImp : IntegrationHandler, KoinComponent {
                         estimatedSize = it.estimatedSize,
                     )
                 }
+
+                is AvDownloadCredentialsFromIntegration -> {
+                    // separate picture + sound files: each one downloaded in byte-range parts, merged with ffmpeg
+                    HLSDownloadCredentials(
+                        link = it.video,
+                        headers = it.headers,
+                        downloadPage = it.downloadPage,
+                        embeddedPlaylist = HLSPlaylistBuilder.buildForWholeFile(it.video, it.videoSize, it.duration),
+                        embeddedAudioPlaylist = it.audio?.let { audio ->
+                            HLSPlaylistBuilder.buildForWholeFile(audio, it.audioSize, it.duration)
+                        },
+                        displayQuality = it.quality,
+                        estimatedSize = it.videoSize?.let { v -> v + (it.audioSize ?: 0) },
+                    )
+                }
             }
             return AddDownloadCredentialsInUiProps(
                 credentials = credentials,

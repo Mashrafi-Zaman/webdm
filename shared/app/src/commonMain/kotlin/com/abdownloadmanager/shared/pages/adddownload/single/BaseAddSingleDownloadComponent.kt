@@ -442,7 +442,13 @@ abstract class BaseAddSingleDownloadComponent(
                     val startTime = System.currentTimeMillis()
                     for (i in channel) {
                         when (i) {
-                            is CanAddResult.DownloadAlreadyExists,
+                            is CanAddResult.DownloadAlreadyExists -> {
+                                // a silent add never skips a duplicate: it's saved as "name (1).ext"
+                                if (onDuplicateStrategy.value == null) {
+                                    setOnDuplicateStrategy(OnDuplicateStrategy.AddNumbered)
+                                }
+                            }
+
                             CanAddResult.CantWriteInThisFolder -> {
                                 return@async true
                             }
