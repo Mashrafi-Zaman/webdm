@@ -85,7 +85,10 @@ data class DurationBasedProcessingDownloadItemState(
     override val progress: Long,
     override val percent: Int,
     override val isWaiting: Boolean,
-
+    // media segments finished / in the stream (init segments not counted); live streams keep growing
+    val segmentsDone: Int = 0,
+    val segmentsTotal: Int = 0,
+    val isLive: Boolean = false,
 ) : ProcessingDownloadItemState {
 
     override val hasProgress get() = progress > 0

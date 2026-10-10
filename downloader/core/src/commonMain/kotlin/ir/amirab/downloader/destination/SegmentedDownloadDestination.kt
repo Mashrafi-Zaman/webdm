@@ -7,7 +7,7 @@ import okio.FileSystem
 import okio.Path.Companion.toOkioPath
 import java.io.File
 
-class SegmentedDownloadDestination(
+open class SegmentedDownloadDestination(
     // a directory unique for this item!
     val tempDirectory: File,
     val getFileName: (DownloadPart) -> String,
@@ -44,14 +44,15 @@ class SegmentedDownloadDestination(
     }
 
     override fun onPartCancelled(part: DownloadPart) {
-        super.onPartCancelled(part)
         val id = part.getID()
+        // close the part's file handles BEFORE super removes them from fileParts (closing them after the removal
+        // found nothing, so the handles stayed open and the temp parts couldn't be deleted on Windows)
         synchronized(this) {
             fileParts
-                .find { it.id == id }
-                ?.writer
-                ?.closeQuietly()
+                .filter { it.id == id }
+                .forEach { it.writer.closeQuietly() }
         }
+        super.onPartCancelled(part)
     }
 
 
@@ -72,12 +73,23 @@ class SegmentedDownloadDestination(
     }
 
     override fun cleanUpJunkFiles() {
+        // open handles would keep Windows from deleting the part files
+        synchronized(this) {
+            fileParts.forEach { it.writer.closeQuietly() }
+            fileParts.clear()
+        }
         runCatching {
             FileSystem.SYSTEM.deleteRecursively(tempDirectory.toOkioPath())
         }
     }
 
     override fun onAllPartsCompleted(onProgressUpdate: (Int?) -> Unit) {
+        assembleOutput(onProgressUpdate)
+        super.onAllPartsCompleted(onProgressUpdate)
+    }
+
+    /** write the downloaded parts into [outputFile] (in id order) */
+    protected open fun assembleOutput(onProgressUpdate: (Int?) -> Unit) {
         assemble(
             getAllParts()
                 .sortedBy { it.getID() }
@@ -85,7 +97,6 @@ class SegmentedDownloadDestination(
             outputFile,
             onProgressUpdate
         )
-        super.onAllPartsCompleted(onProgressUpdate)
     }
 
     fun assemble(
@@ -93,7 +104,7 @@ class SegmentedDownloadDestination(
         destination: File,
         onProgress: (Int) -> Unit
     ) {
-        DownloadDestination.prepareDestinationFolder(outputFile)
+        DownloadDestination.prepareDestinationFolder(destination)
         val totalLength = sources.sumOf { it.length() }
         var totalWritten = 0L
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)

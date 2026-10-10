@@ -1,6 +1,7 @@
 package com.abdownloadmanager.integration
 
 import com.abdownloadmanager.integration.model.AddDownloadsFromIntegration
+import com.abdownloadmanager.integration.model.ApiCapabilities
 import com.abdownloadmanager.integration.model.ApiQueueModel
 import com.abdownloadmanager.integration.model.NewDownloadTask
 
@@ -13,6 +14,9 @@ interface IntegrationHandler{
 
 
     fun listQueues(): List<ApiQueueModel>
+
+    /** what this app can download (GET /capabilities) */
+    fun capabilities(): ApiCapabilities
 
     /**
      * manually add download

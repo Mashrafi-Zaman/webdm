@@ -28,6 +28,11 @@ data class HLSDownloadItem(
     override var password: String? = null,
     override var userAgent: String? = null,
     var duration: Double? = null,
+    override var selectedVariantUrl: String? = null,
+    override var embeddedPlaylist: String? = null,
+    override var embeddedAudioPlaylist: String? = null,
+    override var displayQuality: String? = null,
+    override var estimatedSize: Long? = null,
 ) : IDownloadItem, IHLSCredentials {
     override fun copy(
         id: Option<Long>,
@@ -110,6 +115,11 @@ data class HLSDownloadItem(
                 password = credentials.password,
                 downloadPage = credentials.downloadPage,
                 userAgent = credentials.userAgent,
+                selectedVariantUrl = credentials.selectedVariantUrl,
+                embeddedPlaylist = credentials.embeddedPlaylist,
+                embeddedAudioPlaylist = credentials.embeddedAudioPlaylist,
+                displayQuality = credentials.displayQuality,
+                estimatedSize = credentials.estimatedSize,
                 id = id,
                 folder = folder,
                 name = name,
@@ -127,13 +137,18 @@ data class HLSDownloadItem(
     }
 }
 
-private fun HLSDownloadItem.withHlsCredentials(credentials: IHttpBasedDownloadCredentials) = apply {
+private fun HLSDownloadItem.withHlsCredentials(credentials: IHLSCredentials) = apply {
     link = credentials.link
     headers = credentials.headers
     username = credentials.username
     password = credentials.password
     downloadPage = credentials.downloadPage
     userAgent = credentials.userAgent
+    selectedVariantUrl = credentials.selectedVariantUrl
+    embeddedPlaylist = credentials.embeddedPlaylist
+    embeddedAudioPlaylist = credentials.embeddedAudioPlaylist
+    displayQuality = credentials.displayQuality
+    estimatedSize = credentials.estimatedSize
 }
 
 fun HLSDownloadItem.applyFrom(other: HLSDownloadItem) {
@@ -143,6 +158,12 @@ fun HLSDownloadItem.applyFrom(other: HLSDownloadItem) {
     password = other.password
     downloadPage = other.downloadPage
     userAgent = other.userAgent
+    selectedVariantUrl = other.selectedVariantUrl
+    embeddedPlaylist = other.embeddedPlaylist
+    embeddedAudioPlaylist = other.embeddedAudioPlaylist
+    displayQuality = other.displayQuality
+    estimatedSize = other.estimatedSize
+    duration = other.duration
 
     id = other.id
     folder = other.folder

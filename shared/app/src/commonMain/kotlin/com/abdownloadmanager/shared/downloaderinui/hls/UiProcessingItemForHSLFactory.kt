@@ -14,6 +14,7 @@ object UiProcessingItemForHSLFactory {
         val item = downloadJob.downloadItem
         val downloadParts = downloadJob.getParts()
         val totalPartsCount = downloadParts.size
+        val segmentProgress = downloadJob.getSegmentProgress()
         val uiParts = downloadParts.map {
             UiDurationBasedPart.fromPart(
                 part = it,
@@ -69,6 +70,9 @@ object UiProcessingItemForHSLFactory {
             percent = (percentFraction * 100).toInt(),
             optimisticLength = length,
             isWaiting = props.isWaiting,
+            segmentsDone = segmentProgress.first,
+            segmentsTotal = segmentProgress.second,
+            isLive = downloadJob.isLiveRecording,
         )
     }
 

@@ -9,7 +9,9 @@ import kotlin.reflect.KClass
 
 
 class HLSDownloader(
-    client: Lazy<HttpDownloaderClient>
+    client: Lazy<HttpDownloaderClient>,
+    // ffmpeg etc. (Settings > Tools); used for separate audio tracks, SAMPLE-AES and .ts -> .mp4
+    val mediaTools: HLSMediaTools = HLSMediaTools.None,
 ) : Downloader<HLSDownloadItem, HLSDownloadJob, HLSDownloadCredentials> {
 
     val client: HttpDownloaderClient by client
@@ -22,6 +24,7 @@ class HLSDownloader(
             downloadItem = item,
             downloadManager = downloadManager,
             client = client,
+            mediaTools = mediaTools,
         )
     }
 

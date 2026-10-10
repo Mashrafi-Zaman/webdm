@@ -1,6 +1,7 @@
 package com.abdownloadmanager.integration
 
 import com.abdownloadmanager.integration.model.AddDownloadsFromIntegration
+import com.abdownloadmanager.integration.model.ApiCapabilities
 import com.abdownloadmanager.integration.model.ApiQueueModel
 import com.abdownloadmanager.integration.model.NewDownloadTask
 import io.ktor.server.application.Application
@@ -56,6 +57,13 @@ internal fun Application.setupRouting(
                     )
                 }
                 call.respondText("OK")
+            }
+            get("/capabilities") {
+                val capabilities = integrationHandler.capabilities()
+                call.respondText(
+                    json.encodeToString(ApiCapabilities.serializer(), capabilities),
+                    io.ktor.http.ContentType.Application.Json,
+                )
             }
             get("/queues") {
                 val queues = integrationHandler.listQueues()

@@ -11,6 +11,11 @@ import ir.amirab.util.HttpUrlUtils
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import ir.amirab.downloader.utils.speedlimiter.SpeedLimiter
+import okio.Buffer
+import okio.ForwardingSource
+import okio.Source
+import okio.cipherSource
+import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 
 class HLSPartDownloader(
@@ -19,6 +24,9 @@ class HLSPartDownloader(
     private val baseURL: String,
     private val client: HttpDownloaderClient,
     private val speedLimiters: List<SpeedLimiter>,
+    // the item's headers, cookies, user agent and login: sent with every segment request
+    private val credentials: () -> IHLSCredentials,
+    private val keyProvider: HLSKeyProvider,
 ) : PartDownloader<
         MediaSegment
         >(
@@ -29,6 +37,13 @@ class HLSPartDownloader(
         return maxAllowed
     }
 
+    // raw (still encrypted) bytes received and expected, to detect connections that end early
+    @Volatile
+    private var rawBytesRead = 0L
+
+    @Volatile
+    private var expectedRawLength: Long? = null
+
     override suspend fun connectAndVerify(): Connection<HttpResponseInfo> {
         val fullLink = part.link
             .takeIf { HttpUrlUtils.isValidUrl(it) }
@@ -37,9 +52,21 @@ class HLSPartDownloader(
         requireNotNull(fullLink) {
             "link is incorrect! ${part.link}"
         }
+        val c = credentials()
+        val start = part.rangeStart
+        val end = part.rangeLength?.let { (start ?: 0L) + it - 1 }
+        // the cipher (and the key download) before the segment request, so a key error doesn't waste a connection
+        val cipher = keyProvider.cipherFor(part)
         val connect = client.connect(
-            HttpDownloadCredentials(fullLink.toString()),
-            null, null,
+            HttpDownloadCredentials(
+                link = fullLink.toString(),
+                headers = c.headers,
+                username = c.username,
+                password = c.password,
+                downloadPage = c.downloadPage,
+                userAgent = c.userAgent,
+            ),
+            start, end,
         )
         if (stop || !currentCoroutineContext().isActive) {
             connect.close()
@@ -47,17 +74,23 @@ class HLSPartDownloader(
         }
         if (!connect.responseInfo.isSuccessFul) {
             connect.close()
-            throw CancellationException()
+            throw IOException("segment request failed: HTTP ${connect.responseInfo.statusCode}")
         }
-        part.length = connect.responseInfo.contentLength
-        return connect.let {
-            it.copy(
-                source = speedLimiters.fold(it.source) { acc, thr ->
-                    thr.source(acc)
-                }
-            )
+        rawBytesRead = 0
+        expectedRawLength = connect.responseInfo.contentLength?.takeIf { it > 0 }
+        // progress is measured in written (decrypted) bytes; close enough to the content length for the UI
+        part.length = expectedRawLength
+        val counting: Source = object : ForwardingSource(connect.source) {
+            override fun read(sink: Buffer, byteCount: Long): Long {
+                val read = super.read(sink, byteCount)
+                if (read > 0) rawBytesRead += read
+                return read
+            }
         }
-
+        val limited = speedLimiters.fold(counting) { acc, thr -> thr.source(acc) }
+        return connect.copy(
+            source = if (cipher != null) limited.cipherSource(cipher) else limited
+        )
     }
 
     override fun onCanceled(e: Throwable) {
@@ -69,6 +102,12 @@ class HLSPartDownloader(
     }
 
     override fun onFinish() {
+        val expected = expectedRawLength
+        if (expected != null && rawBytesRead < expected) {
+            // the server closed the connection early: don't accept a truncated segment
+            onCanceled(IOException("segment ended early ($rawBytesRead of $expected bytes)"))
+            return
+        }
         part.isCompleted = true
         super.onFinish()
     }

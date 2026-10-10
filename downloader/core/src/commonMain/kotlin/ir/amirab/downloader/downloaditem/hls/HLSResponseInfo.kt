@@ -1,107 +1,97 @@
 package ir.amirab.downloader.downloaditem.hls
 
-import io.lindstrom.m3u8.model.KeyMethod
 import io.lindstrom.m3u8.model.MediaPlaylist
-import io.lindstrom.m3u8.parser.MediaPlaylistParser
-import io.lindstrom.m3u8.parser.ParsingMode
-import ir.amirab.downloader.connection.Connection
+import ir.amirab.downloader.connection.HttpDownloaderClient
 import ir.amirab.downloader.connection.IResponseInfo
 import ir.amirab.downloader.connection.response.HttpResponseInfo
 import ir.amirab.downloader.connection.response.expectSuccess
-import ir.amirab.downloader.utils.FileNameUtil
-import ir.amirab.util.HttpUrlUtils
+import ir.amirab.downloader.downloaditem.http.HttpDownloadCredentials
 import okio.buffer
 import java.io.IOException
 
+/** A checked HLS stream: what the add-download dialog shows and what the download job downloads. */
 data class HLSResponseInfo(
-    val httpResponseInfo: HttpResponseInfo,
-    val hlsManifest: MediaPlaylist
+    // response of the first playlist request; null for embedded playlists (streams rebuilt by the extension)
+    val httpResponseInfo: HttpResponseInfo?,
+    val stream: ResolvedHLSStream,
 ) : IResponseInfo {
+    val hlsManifest: MediaPlaylist get() = stream.video.playlist
+
     val name: String?
-        get() = httpResponseInfo.fileName
-    val duration = hlsManifest.mediaSegments()
-        .sumOf { it.duration() }
-        .takeIf { it > 0 }
+        get() = httpResponseInfo?.fileName
+    val duration = stream.duration.takeIf { it > 0 }
 
     override val isSuccessFul: Boolean
-        get() = httpResponseInfo.isSuccessFul
+        get() = httpResponseInfo?.isSuccessFul ?: true
     override val requiresAuth: Boolean
-        get() = httpResponseInfo.requireBasicAuth
+        get() = httpResponseInfo?.requireBasicAuth ?: false
     override val requireBasicAuth: Boolean
-        get() = httpResponseInfo.requireBasicAuth
+        get() = httpResponseInfo?.requireBasicAuth ?: false
     override val isWebPage: Boolean
-        get() = httpResponseInfo.isWebPage
+        get() = httpResponseInfo?.isWebPage ?: false
     override val resumeSupport: Boolean
         get() = true
     override val unsuccessFullException: Throwable?
-        get() = httpResponseInfo.unsuccessFullException
+        get() = httpResponseInfo?.unsuccessFullException
 
     companion object {
-        fun fromConnection(connection: Connection<HttpResponseInfo>): HLSResponseInfo {
-            expectSuccess(connection)
-            val data = connection.source.buffer().use { it.readUtf8() }
-            val playlist = try {
-                parseHLSAsMediaPlaylist(data)
-            } catch (e: Exception) {
-                throw BadHLSResponseException("can't parse HLS playlist", e)
+        /** Fetch (or read the embedded) playlist(s) and resolve the stream, with the item's headers/cookies/UA. */
+        suspend fun resolve(client: HttpDownloaderClient, credentials: IHLSCredentials): HLSResponseInfo {
+            var firstResponse: HttpResponseInfo? = null
+            val stream = HLSStreamResolver.resolve(credentials) { url ->
+                val (response, text) = fetchPlaylist(client, credentials, url)
+                if (firstResponse == null) firstResponse = response
+                text
             }
-            val mediaSegments = playlist.mediaSegments()
-            if (mediaSegments.isEmpty()) {
-                throw UnsupportedOperationException(
-                    "playlist has no segments"
-                )
-            }
-            val firstSegmentExtension = HttpUrlUtils
-                .createURL(connection.responseInfo.requestUrl)
-                .resolve(mediaSegments[0].uri())?.toString()
-                ?.let(HttpUrlUtils::extractNameFromLink)
-                ?.let(FileNameUtil::getExtensionOrNull)
-                ?.lowercase()
-            if (firstSegmentExtension != "ts") {
-                throw UnsupportedOperationException(
-                    "Only HLS .ts segments supported at the moment, but '$firstSegmentExtension' provided"
-                )
-            }
-            if (isMediaPlayListEncrypted(playlist)) {
-                throw UnsupportedOperationException(
-                    "Encrypted HLS playlists are not supported"
-                )
-            }
-            return HLSResponseInfo(
-                connection.responseInfo,
-                playlist,
+            return HLSResponseInfo(firstResponse, stream)
+        }
+
+        suspend fun fetchPlaylist(
+            client: HttpDownloaderClient,
+            credentials: IHLSCredentials,
+            url: String,
+        ): Pair<HttpResponseInfo, String> {
+            val request = HttpDownloadCredentials(
+                link = url,
+                headers = credentials.headers,
+                username = credentials.username,
+                password = credentials.password,
+                downloadPage = credentials.downloadPage,
+                userAgent = credentials.userAgent,
             )
+            return client.connect(request, null, null).use { connection ->
+                expectPlaylistResponse(connection.responseInfo)
+                connection.responseInfo to connection.source.buffer().use { it.readUtf8() }
+            }
         }
 
-        private fun parseHLSAsMediaPlaylist(data: String): MediaPlaylist {
-            val playlistParser = MediaPlaylistParser(ParsingMode.LENIENT)
-            return playlistParser.readPlaylist(data)
-        }
-
-        private val HALS_POSSIBLE_HEADERS = listOf(
+        private val HLS_CONTENT_TYPES = listOf(
             "application/x-mpegurl",
             "application/vnd.apple.mpegurl",
+            "audio/mpegurl",
+            "audio/x-mpegurl",
         )
 
         /**
-         * if no hls content-size received we check this
+         * if no hls content-type received we check this
          */
         private const val MAXIMUM_ALLOWED_SIZE = 2 * 1024 * 1024 // 2MiB
-        private fun expectSuccess(connection: Connection<HttpResponseInfo>) {
-            connection.responseInfo.expectSuccess()
-            val hlsPossibleHeaders = HALS_POSSIBLE_HEADERS
-            val contentType = connection.responseInfo.responseHeaders["content-type"]
+
+        private fun expectPlaylistResponse(responseInfo: HttpResponseInfo) {
+            responseInfo.expectSuccess()
+            val contentType = responseInfo.responseHeaders["content-type"]
             var error: String? = null
             if (contentType == null) {
                 error = "no content type is provided"
             } else {
-                val isHLSContentType = hlsPossibleHeaders.any { it.startsWith(contentType, ignoreCase = true) }
+                // "application/vnd.apple.mpegurl; charset=utf-8" starts with a known type (not the other way round)
+                val isHLSContentType = HLS_CONTENT_TYPES.any { contentType.trim().startsWith(it, ignoreCase = true) }
                 if (!isHLSContentType) {
                     error = "content type is not hls compatible: $contentType"
                 }
             }
             if (error != null) {
-                val contentLength = connection.responseInfo.contentLength
+                val contentLength = responseInfo.contentLength
                 if (contentLength == null) {
                     error += ", and content length is unknown"
                 } else {
@@ -114,14 +104,6 @@ data class HLSResponseInfo(
             }
             if (error != null) {
                 throw BadHLSResponseException(error)
-            }
-        }
-
-        private fun isMediaPlayListEncrypted(playlist: MediaPlaylist): Boolean {
-            return playlist.mediaSegments().any {
-                it.segmentKeys().any { key ->
-                    key.method() != KeyMethod.NONE
-                }
             }
         }
     }

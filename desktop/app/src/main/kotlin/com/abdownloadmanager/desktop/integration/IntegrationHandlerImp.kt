@@ -13,6 +13,9 @@ import com.abdownloadmanager.shared.util.DownloadSystem
 import ir.amirab.downloader.NewDownloadItemProps
 import ir.amirab.downloader.downloaditem.EmptyContext
 import ir.amirab.downloader.downloaditem.hls.HLSDownloadCredentials
+import ir.amirab.downloader.downloaditem.hls.HLSMediaTools
+import ir.amirab.downloader.downloaditem.hls.HLSPlaylistBuilder
+import com.abdownloadmanager.desktop.utils.AppInfo
 import ir.amirab.downloader.downloaditem.http.HttpDownloadCredentials
 import ir.amirab.downloader.queue.QueueManager
 import ir.amirab.downloader.utils.OnDuplicateStrategy
@@ -25,6 +28,7 @@ class IntegrationHandlerImp : IntegrationHandler, KoinComponent {
     val queueManager by inject<QueueManager>()
     val appSettings by inject<AppRepository>()
     private val downloaderInUiRegistry by inject<DownloaderInUiRegistry>()
+    private val mediaTools by inject<HLSMediaTools>()
 
     override suspend fun addDownloadByGui(
         request: AddDownloadsFromIntegration
@@ -42,6 +46,18 @@ class IntegrationHandlerImp : IntegrationHandler, KoinComponent {
                     )
                 } else null
             )
+        )
+    }
+
+    override fun capabilities(): ApiCapabilities {
+        return ApiCapabilities(
+            app = AppInfo.displayName,
+            version = AppInfo.version.toString(),
+            jobTypes = ApiCapabilities.JOB_TYPES,
+            features = ApiCapabilities.baseFeatures() + mapOf(
+                // separate audio tracks, SAMPLE-AES and .ts -> .mp4 need it
+                "ffmpeg" to (mediaTools.ffmpegPath() != null),
+            ),
         )
     }
 
@@ -105,6 +121,22 @@ class IntegrationHandlerImp : IntegrationHandler, KoinComponent {
                         link = it.link,
                         headers = it.headers,
                         downloadPage = it.downloadPage,
+                    )
+                }
+
+                is SegmentsDownloadCredentialsFromIntegration -> {
+                    // a stream rebuilt from its numbered segments: downloaded like an HLS stream whose playlist
+                    // we build here (init + ordered segments), into one .mp4
+                    HLSDownloadCredentials(
+                        link = it.init ?: it.segments.firstOrNull() ?: it.link,
+                        headers = it.headers,
+                        downloadPage = it.downloadPage,
+                        embeddedPlaylist = HLSPlaylistBuilder.build(it.init, it.segments, it.duration),
+                        embeddedAudioPlaylist = it.audioSegments?.takeIf { list -> list.isNotEmpty() }?.let { audio ->
+                            HLSPlaylistBuilder.build(it.audioInit, audio, it.duration)
+                        },
+                        displayQuality = it.quality,
+                        estimatedSize = it.estimatedSize,
                     )
                 }
             }

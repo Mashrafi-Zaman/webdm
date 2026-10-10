@@ -1,6 +1,13 @@
 package com.abdownloadmanager.shared.downloaderinui.hls.add
 
 import com.abdownloadmanager.resources.Res
+import androidx.compose.runtime.mutableStateListOf
+import com.abdownloadmanager.shared.ui.configurable.item.EnumConfigurable
+import com.abdownloadmanager.shared.util.convertPositiveBytesToHumanReadable
+import ir.amirab.downloader.downloaditem.hls.HLSEncryption
+import ir.amirab.downloader.downloaditem.hls.HLSVariantOption
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import com.abdownloadmanager.shared.downloaderinui.DownloadSize
 import com.abdownloadmanager.shared.downloaderinui.add.NewDownloadInputs
 import ir.amirab.downloader.downloaditem.hls.HLSDownloadCredentials
@@ -32,7 +39,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class HLSNewDownloadInputs(
-    downloadUiChecker: HLSNewDownloadUIChecker,
+    private val downloadUiChecker: HLSNewDownloadUIChecker,
     private val sizeAndSpeedUnitProvider: SizeAndSpeedUnitProvider,
     private val scope: CoroutineScope,
 ) : NewDownloadInputs<
@@ -83,9 +90,49 @@ class HLSNewDownloadInputs(
     override val downloadJobConfig: StateFlow<DownloadJobExtraConfig?> = downloadUiChecker.responseInfo.mapStateFlow {
         it?.let {
             HLSDownloadJobExtraConfig(
-                hlsManifest = it.hlsManifest
+                stream = it.stream
             )
         }
+    }
+
+    // ---------- quality (master playlists) ----------
+    // a snapshot list so the dropdown updates when the qualities are known (after the playlist is fetched)
+    private val qualityOptions = mutableStateListOf<HLSVariantOption>()
+    // placeholder while there is no list (the dropdown is hidden then)
+    private val noQuality = HLSVariantOption(url = "", bandwidth = 0, width = null, height = null, audioGroup = null)
+    private val selectedQuality = MutableStateFlow(noQuality)
+    private val hasQualities = downloadUiChecker.variants.mapStateFlow { it.isNotEmpty() }
+
+    init {
+        downloadUiChecker.variants.onEach { variants ->
+            if (variants.map { it.url } == qualityOptions.map { it.url }) return@onEach
+            qualityOptions.clear()
+            qualityOptions.addAll(variants)
+            // default: the chosen one (if still offered), else the highest
+            val chosen = variants.firstOrNull { it.url == credentials.value.selectedVariantUrl } ?: variants.firstOrNull()
+            selectedQuality.value = chosen ?: noQuality
+        }.launchIn(scope)
+        selectedQuality.onEach { quality ->
+            if (quality.url.isNotEmpty() && quality.url != credentials.value.selectedVariantUrl) {
+                setCredentials(credentials.value.copy(selectedVariantUrl = quality.url))
+            }
+        }.launchIn(scope)
+    }
+
+    private val qualityConfigurable = EnumConfigurable(
+        title = "Quality".asStringSource(),
+        description = "Video quality to download (master playlist)".asStringSource(),
+        backedBy = selectedQuality,
+        describe = { qualityLabel(it).asStringSource() },
+        possibleValues = qualityOptions,
+        valueToString = { listOf(qualityLabel(it)) },
+        visible = hasQualities,
+    )
+
+    private fun qualityLabel(q: HLSVariantOption): String {
+        if (q.url.isEmpty()) return ""
+        val resolution = if (q.width != null && q.height != null) " (${q.width}x${q.height})" else ""
+        return "${q.label}$resolution - ${q.bandwidth / 1000} kbps"
     }
 
     override fun applyHostSettingsToExtraConfig(extraConfig: PerHostSettingsItem) {
@@ -99,6 +146,7 @@ class HLSNewDownloadInputs(
     }
 
     override val configurableList = listOf(
+        qualityConfigurable,
         ToggleableSpeedLimitConfigurable(
             Res.string.download_item_settings_speed_limit.asStringSource(),
             Res.string.download_item_settings_speed_limit_description.asStringSource(),
@@ -200,7 +248,27 @@ class HLSNewDownloadInputs(
         )
     )
 
+    /** "10:00 - 1080p - 120 segments - ~11.4 MB" (plus notes like AES-128, separate audio, live) */
     override fun downloadSizeToStringSource(downloadSize: DownloadSize.Duration): StringSource {
-        return downloadSize.asStringSource()
+        val stream = downloadUiChecker.responseInfo.value?.stream
+        val c = credentials.value
+        val parts = mutableListOf(formatDuration(downloadSize.duration))
+        (stream?.selectedVariant?.label ?: c.displayQuality)?.let { parts += it }
+        stream?.let { parts += "${it.mediaSegmentCount} segments" }
+        c.estimatedSize?.takeIf { it > 0 }?.let { size ->
+            convertPositiveBytesToHumanReadable(size, sizeAndSpeedUnitProvider.sizeUnit.value)?.let { parts += "~$it" }
+        }
+        if (stream?.audio != null) parts += "separate audio"
+        if (stream?.encryption == HLSEncryption.Aes128) parts += "AES-128"
+        if (stream?.isLive == true) parts += "live (records until you stop it)"
+        return parts.joinToString(" - ").asStringSource()
+    }
+
+    private fun formatDuration(seconds: Double): String {
+        val total = seconds.toLong()
+        val h = total / 3600
+        val m = (total % 3600) / 60
+        val s = total % 60
+        return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
     }
 }
