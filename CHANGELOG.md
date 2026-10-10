@@ -30,6 +30,8 @@ First release of WebDM (Web Download Manager), a Windows x64 fork of AB Download
 - ffmpeg (LGPL) and yt-dlp ship with the installer; Settings > Tools can update them
 - Drag and drop: drop links or .txt files of links on the main window or on an optional floating drop target
 - Local API: GET /capabilities and the new "segments", "av" and "page" job types (see REST-API.yml)
+- Browser extension: floating "Download with WebDM" button for players, also inside iframes, with one entry per video
+  and its qualities; per-site switches for popular sites
 
 ### Changed
 
@@ -37,6 +39,12 @@ First release of WebDM (Web Download Manager), a Windows x64 fork of AB Download
   so WebDM can run next to AB Download Manager
 - Windows x64 only; the browser extension (WebDM Integration) is for Chromium browsers (Chrome, Edge, Brave, Opera)
 - A silent add renames a duplicate to "name (1).ext" instead of skipping it
+
+### Removed
+
+- Firefox and Android builds
+- Tools > Download Browser Integration (store links); the extension is installed from the release zip
+- Telegram, donation and translation-project links inherited from AB Download Manager
 
 ### Fixed
 
