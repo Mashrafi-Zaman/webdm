@@ -11,3 +11,8 @@ Changes made in this fork include, among others: rebranding to
 installer identity, integration port and native-messaging host name.
 
 WebDM is not affiliated with or endorsed by the AB Download Manager project.
+
+Third-party tools shipped with the Windows installer:
+- FFmpeg (https://ffmpeg.org), an LGPL-2.1-or-later build from https://github.com/BtbN/FFmpeg-Builds, used as a
+  separate program (resources/tools/ffmpeg). Its license (LICENSE.txt) and the exact build and source location
+  (SOURCE.txt) are installed next to ffmpeg.exe. FFmpeg is a trademark of Fabrice Bellard.

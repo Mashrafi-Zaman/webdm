@@ -6,6 +6,9 @@ import dev.nucleusframework.desktop.application.dsl.TargetFormat
 import ir.amirab.util.platform.Arch
 import ir.amirab.util.platform.Platform
 import ir.amirab.util.platform.isWindows
+import java.net.URI
+import java.security.MessageDigest
+import java.util.zip.ZipInputStream
 
 plugins {
     id(MyPlugins.kotlin)
@@ -228,6 +231,68 @@ fun Task.dependsOnAOT() {
         dependsOn("generateReleaseAotCache")
     }
 }
+
+// ======= bundled tools
+// The LGPL ffmpeg (Windows x64) ships with the app, in its resources (resources/windows/tools/ffmpeg -> at runtime
+// <app>/resources/tools/ffmpeg). Downloaded at build time from github.com/BtbN/FFmpeg-Builds and checked against
+// that release's checksums.sha256; not kept in git. Users can still update it from Settings > Tools.
+val bundledFfmpegZip = "ffmpeg-n8.1-latest-win64-lgpl-8.1.zip"
+val bundledFfmpegRelease = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
+val bundledFfmpegDir = project.layout.projectDirectory.dir("resources/windows/tools/ffmpeg")
+val downloadBundledFfmpeg = tasks.register("downloadBundledFfmpeg") {
+    description = "Downloads the LGPL ffmpeg build that is packaged with the app"
+    val outDir = bundledFfmpegDir.asFile
+    outputs.dir(outDir)
+    onlyIf { !outDir.resolve("ffmpeg.exe").isFile }
+    doLast {
+        fun open(url: String) = URI(url).toURL().openConnection().apply {
+            connectTimeout = 30_000
+            readTimeout = 120_000
+        }.getInputStream()
+        val expected = open("$bundledFfmpegRelease/checksums.sha256").bufferedReader().use { it.readText() }
+            .lineSequence()
+            .map { it.trim().split(Regex("\\s+")) }
+            .firstOrNull { it.size == 2 && it[1].removePrefix("*") == bundledFfmpegZip }
+            ?.get(0)?.lowercase()
+            ?: error("$bundledFfmpegZip is not listed in checksums.sha256")
+        val zip = layout.buildDirectory.file("tmp/$bundledFfmpegZip").get().asFile
+        zip.parentFile.mkdirs()
+        val digest = MessageDigest.getInstance("SHA-256")
+        open("$bundledFfmpegRelease/$bundledFfmpegZip").use { input ->
+            zip.outputStream().use { output ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    output.write(buffer, 0, n)
+                    digest.update(buffer, 0, n)
+                }
+            }
+        }
+        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        check(actual == expected) { "checksum mismatch for $bundledFfmpegZip" }
+        outDir.deleteRecursively()
+        outDir.mkdirs()
+        ZipInputStream(zip.inputStream()).use { zin ->
+            while (true) {
+                val entry = zin.nextEntry ?: break
+                val name = entry.name.substringAfterLast('/')
+                val wanted = (entry.name.contains("/bin/") && name == "ffmpeg.exe") ||
+                        (!entry.isDirectory && name == "LICENSE.txt" && entry.name.count { it == '/' } <= 1)
+                if (wanted) outDir.resolve(name).outputStream().use { zin.copyTo(it) }
+            }
+        }
+        check(outDir.resolve("ffmpeg.exe").isFile) { "ffmpeg.exe not found in $bundledFfmpegZip" }
+        outDir.resolve("SOURCE.txt").writeText(
+            "ffmpeg (LGPL build) from $bundledFfmpegRelease/$bundledFfmpegZip\n" +
+                    "sha256 $actual\n" +
+                    "Source code: https://ffmpeg.org/download.html and https://github.com/BtbN/FFmpeg-Builds\n"
+        )
+        zip.delete()
+    }
+}
+tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(downloadBundledFfmpeg) }
+// ======= end of bundled tools
 
 val postReleaseDistributable = tasks.register("postReleaseDistributable") {
     dependsOn("createReleaseDistributable")
