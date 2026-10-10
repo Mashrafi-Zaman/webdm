@@ -1,7 +1,7 @@
 package com.abdownloadmanager.desktop.nativemessaging
 
 import com.abdownloadmanager.desktop.utils.AppInfo
-import com.abdownloadmanager.shared.util.SharedConstants
+import com.abdownloadmanager.shared.util.TrustedExtensions
 import io.ktor.util.Platform
 import ir.amirab.util.logger.thisLogger
 import kotlinx.serialization.SerialName
@@ -61,9 +61,8 @@ class NativeMessaging(
             description = AppInfo.displayName,
             path = execFile,
             type = "stdio",
-            allowedOrigins = listOf(
-                SharedConstants.chromeExtensionOrigin
-            )
+            // the unpacked build and any store builds (TrustedExtensions.kt)
+            allowedOrigins = TrustedExtensions.origins
         )
     }
 

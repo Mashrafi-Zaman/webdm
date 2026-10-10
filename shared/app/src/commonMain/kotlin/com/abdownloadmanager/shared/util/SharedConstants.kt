@@ -29,5 +29,4 @@ object SharedConstants : BaseConstants {
     )
     override val telegramChannelUrl: String = BuildConfig.TELEGRAM_CHANNEL
     override val telegramGroupUrl: String = BuildConfig.TELEGRAM_GROUP
-    override val chromeExtensionOrigin: String = BuildConfig.INTEGRATION_CHROME_EXTENSION_ID
 }

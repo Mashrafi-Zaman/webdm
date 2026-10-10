@@ -5,6 +5,7 @@ import com.abdownloadmanager.desktop.nativemessaging.host.stdio.TypeSafeStdioPro
 import com.abdownloadmanager.desktop.utils.EntryType
 import com.abdownloadmanager.desktop.utils.EntrypointInitializer
 import com.abdownloadmanager.desktop.utils.singleInstance.SingleInstanceManager
+import com.abdownloadmanager.shared.util.TrustedExtensions
 import ir.amirab.util.logger.appLogger
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerializationException
@@ -34,6 +35,13 @@ class NativeMessagingHost(
     }
 
     fun main(args: Array<String>) {
+        // Chromium browsers pass the calling extension's origin ("chrome-extension://<id>/") as an argument;
+        // the manifest already limits callers to TrustedExtensions, this is a second check
+        val callerOrigin = args.firstOrNull { it.startsWith("chrome-extension://") }
+        if (callerOrigin != null && !TrustedExtensions.isTrustedOrigin(callerOrigin)) {
+            logger.w { "Refusing untrusted caller $callerOrigin" }
+            exitProcess(1)
+        }
         val result = try {
             logger.d { "Starting native messaging host..." }
             // Initialize Koin DI

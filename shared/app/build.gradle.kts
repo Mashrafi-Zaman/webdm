@@ -147,12 +147,6 @@ buildConfig {
         }
     )
     buildConfigField(
-        "INTEGRATION_CHROME_EXTENSION_ID",
-        provider {
-            "chrome-extension://aciclgnjjaijdpnkkgileppmbpldobjj/"
-        }
-    )
-    buildConfigField(
         "TELEGRAM_GROUP",
         provider {
             "https://github.com/Mashrafi-Zaman/webdm/discussions"
