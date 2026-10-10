@@ -229,14 +229,6 @@ val supportActionGroup = MenuItem.SubMenu(
         item(Res.string.source_code.asStringSource(), MyIcons.openSource) {
             URLOpener.openUrl(SharedConstants.projectSourceCode)
         }
-        subMenu(Res.string.telegram.asStringSource(), MyIcons.telegram) {
-            item(Res.string.channel.asStringSource(), MyIcons.speaker) {
-                URLOpener.openUrl(SharedConstants.telegramChannelUrl)
-            }
-            item(Res.string.group.asStringSource(), MyIcons.group) {
-                URLOpener.openUrl(SharedConstants.telegramGroupUrl)
-            }
-        }
     }
 )
 

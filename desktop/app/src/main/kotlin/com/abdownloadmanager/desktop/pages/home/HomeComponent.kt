@@ -19,7 +19,6 @@ import com.abdownloadmanager.shared.pages.adddownload.AddDownloadCredentialsInUi
 import com.abdownloadmanager.desktop.pages.category.DesktopCategoryDialogManager
 import com.abdownloadmanager.desktop.storage.AppSettingsStorage
 import com.abdownloadmanager.resources.Res
-import com.abdownloadmanager.shared.action.donate
 import com.abdownloadmanager.shared.action.supportActionGroup
 import com.abdownloadmanager.shared.pagemanager.EditDownloadDialogManager
 import com.abdownloadmanager.shared.pagemanager.EnterNewURLDialogManager
@@ -215,7 +214,6 @@ class HomeComponent(
             separator()
             +openOpenSourceThirdPartyLibraries
             +openTranslators
-            +donate
             separator()
             +checkForUpdateAction
             +openAboutAction
