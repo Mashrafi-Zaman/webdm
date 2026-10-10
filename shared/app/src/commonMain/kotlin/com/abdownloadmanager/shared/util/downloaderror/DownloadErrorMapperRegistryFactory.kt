@@ -16,6 +16,7 @@ class DownloadErrorMapperRegistryFactory {
             TimeoutErrorMapper,
             SSLNotTrustedErrorMapper,
             NotEnoughStorageAvailableExceptionMapper(),
+            MediaStreamErrorMapper,
             // at last
             DefaultDownloadErrorMapper,
         )

@@ -549,6 +549,11 @@ class HLSDownloadJob(
             isLiveRecording = stream.isLive
             updateParts(stream)
             downloadItem.liveRecording = stream.isLive
+        } else {
+            // the parts came from the add-download dialog (or an earlier run): still check what the stream needs
+            // (ffmpeg, no DRM) before downloading anything, not only when the file is put together at the end
+            pendingStreamFromDialog?.let { validateStream(it) } ?: validatePartRequirements()
+            pendingStreamFromDialog = null
         }
         // at this point we have all the parts we need either by hitting remote or they are already in destination
         // before proceed we should check the downloaded parts and remove the "isCompleted" flag if they are missing
@@ -583,6 +588,13 @@ class HLSDownloadJob(
         }
         if (stream.format == HLSSegmentFormat.Ts && stream.audio == null && outputIsMp4 && mediaTools.ffmpegPath() == null) {
             throw FfmpegMissingException("Saving an MPEG-TS stream as .mp4")
+        }
+    }
+
+    /** What the known parts need when the stream itself isn't fetched again (see [validateStream]). */
+    private fun validatePartRequirements() {
+        if (getParts().any { it.track == 1 } && mediaTools.ffmpegPath() == null) {
+            throw FfmpegMissingException("A video with a separate audio track")
         }
     }
 
