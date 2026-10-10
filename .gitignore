@@ -9,3 +9,6 @@ local.properties
 
 # Ignore android keystores
 *.jks
+
+# bundled tools, downloaded at build time (desktop/app/build.gradle.kts: downloadBundledFfmpeg)
+desktop/app/resources/windows/tools/

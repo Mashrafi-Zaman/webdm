@@ -583,6 +583,20 @@ class AppComponent(
                 onNewDownloadEvent(it)
             }
             .launchIn(scope)
+        // live recordings the app was closed during: what was recorded is kept; offer to continue or finish them
+        scope.launch {
+            val names = downloadSystem.getInterruptedLiveRecordingIds()
+                .mapNotNull { downloadSystem.getDownloadItemById(it)?.name }
+            if (names.isNotEmpty()) {
+                sendDialogNotification(
+                    title = "Interrupted live recording".asStringSource(),
+                    type = MessageDialogType.Info,
+                    description = ("${names.joinToString(", ")}: what was recorded is kept. " +
+                            "Resume to continue recording, or right-click and choose " +
+                            "\"Finish live recording\" to save it as a file.").asStringSource(),
+                )
+            }
+        }
 //        IntegrationPortBroadcaster.cleanOnClose()
         integration
             .integrationStatus

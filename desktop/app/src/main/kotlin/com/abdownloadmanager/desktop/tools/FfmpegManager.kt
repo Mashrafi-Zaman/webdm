@@ -25,7 +25,8 @@ import java.util.zip.ZipInputStream
 /**
  * ffmpeg for HLS downloads (separate audio tracks, SAMPLE-AES, .ts -> .mp4; always stream copy).
  * "Download or update" installs the LGPL Windows build from github.com/BtbN/FFmpeg-Builds (checked against the
- * release's checksums.sha256) into WebDM's tools folder, with its license. An ffmpeg on PATH is used otherwise.
+ * release's checksums.sha256) into WebDM's tools folder, with its license. Otherwise the LGPL ffmpeg bundled with
+ * the installer (app resources, tools/ffmpeg) is used, then an ffmpeg on PATH.
  */
 class FfmpegManager(
     private val scope: CoroutineScope,
@@ -36,10 +37,19 @@ class FfmpegManager(
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
     @Serializable
-    private data class ToolsSettings(val convertTsToMp4: Boolean = false)
+    private data class ToolsSettings(val convertTsToMp4: Boolean = true)
 
-    val bundledFfmpeg: File get() = ffmpegDir.resolve("ffmpeg.exe")
-    val licenseFile: File get() = ffmpegDir.resolve("LICENSE.txt")
+    // installed / updated from the Tools page
+    val installedFfmpeg: File get() = ffmpegDir.resolve("ffmpeg.exe")
+
+    // shipped with the installer (build: downloadBundledFfmpeg in desktop/app/build.gradle.kts)
+    private val shippedFfmpegDir: File? = System.getProperty("compose.application.resources.dir")
+        ?.let { File(it, "tools/ffmpeg") }
+    val shippedFfmpeg: File? get() = shippedFfmpegDir?.resolve("ffmpeg.exe")
+
+    val licenseFile: File
+        get() = if (installedFfmpeg.isFile || shippedFfmpegDir == null) ffmpegDir.resolve("LICENSE.txt")
+        else shippedFfmpegDir.resolve("LICENSE.txt")
 
     private val _status = MutableStateFlow("")
     val status: StateFlow<String> = _status.asStateFlow()
@@ -54,7 +64,8 @@ class FfmpegManager(
     }
 
     override fun ffmpegPath(): File? {
-        if (bundledFfmpeg.isFile) return bundledFfmpeg
+        if (installedFfmpeg.isFile) return installedFfmpeg
+        shippedFfmpeg?.takeIf { it.isFile }?.let { return it }
         return pathFfmpeg
     }
 
@@ -74,7 +85,11 @@ class FfmpegManager(
             "Not installed"
         } else {
             val version = versionOf(ffmpeg) ?: "unknown version"
-            val where = if (ffmpeg == bundledFfmpeg) "WebDM tools folder" else ffmpeg.absolutePath
+            val where = when (ffmpeg) {
+                installedFfmpeg -> "WebDM tools folder"
+                shippedFfmpeg -> "included with WebDM"
+                else -> ffmpeg.absolutePath
+            }
             "Installed: $version ($where)"
         }
     }

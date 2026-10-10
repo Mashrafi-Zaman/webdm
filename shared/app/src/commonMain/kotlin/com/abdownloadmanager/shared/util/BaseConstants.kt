@@ -14,6 +14,5 @@ interface BaseConstants {
     val browserIntegrations: List<BrowserIntegrationModel>
     val telegramGroupUrl: String
     val telegramChannelUrl: String
-    val firefoxExtensionId: String
     val chromeExtensionOrigin: String
 }

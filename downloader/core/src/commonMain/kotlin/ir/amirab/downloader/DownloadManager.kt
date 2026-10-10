@@ -8,6 +8,8 @@ import ir.amirab.downloader.downloaditem.contexts.DuplicateRemoval
 import ir.amirab.downloader.downloaditem.contexts.RemovedBy
 import ir.amirab.downloader.downloaditem.DownloadJobStatus
 import ir.amirab.downloader.downloaditem.DownloadStatus
+import ir.amirab.downloader.downloaditem.hls.HLSDownloadItem
+import ir.amirab.downloader.downloaditem.hls.HLSDownloadJob
 import ir.amirab.downloader.utils.DuplicateFilterByPath
 import ir.amirab.downloader.utils.EmptyFileCreator
 import ir.amirab.downloader.utils.FileNameUtil
@@ -316,16 +318,41 @@ class DownloadManager(
         return status is DownloadJobStatus.CanBeResumed
     }
 
+    // true while the app stops every download (exit, "stop all"): live recordings are then kept as they are, to
+    // be continued or finished later, instead of being written out
+    @Volatile
+    var isStoppingAll = false
+
     suspend fun stopAll(
         context: DownloadItemContext = EmptyContext,
     ) {
-        downloadJobs.filter {
-            it.status.value == DownloadJobStatus.Downloading
-        }.map {
-            scope.async {
-                pause(it.id, context)
-            }
-        }.awaitAll()
+        val wasStopping = isStoppingAll
+        isStoppingAll = true
+        try {
+            downloadJobs.filter {
+                it.status.value == DownloadJobStatus.Downloading
+            }.map {
+                scope.async {
+                    pause(it.id, context)
+                }
+            }.awaitAll()
+        } finally {
+            isStoppingAll = wasStopping
+        }
+    }
+
+    /** A live recording that was interrupted (e.g. the app closed while recording): it can continue or be finished */
+    suspend fun isInterruptedLiveRecording(id: Long): Boolean {
+        val item = dlListDb.getById(id) as? HLSDownloadItem ?: return false
+        val job = getDownloadJob(id)
+        return item.liveRecording && item.status != DownloadStatus.Completed && job?.isDownloadActive?.value != true
+    }
+
+    /** Write what an interrupted live recording recorded, instead of continuing it. */
+    suspend fun finishInterruptedLiveRecording(id: Long): Boolean {
+        if (!isInterruptedLiveRecording(id)) return false
+        val job = getDownloadJob(id) ?: dlListDb.getById(id)?.let { createJob(it) }
+        return (job as? HLSDownloadJob)?.finishInterruptedLiveRecording() ?: false
     }
 
     fun getActiveCount(): Int {

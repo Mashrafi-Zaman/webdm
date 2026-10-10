@@ -27,7 +27,7 @@ object FileNameUtil {
             var counter = 1
             while (currentCoroutineContext().isActive) {
                 val newFile = filename.parentFile.resolve(
-                    "${name}_${counter}${ext}"
+                    "${name} (${counter})${ext}"
                 )
                 if (!newFile.exists()) {
                     emit(newFile)

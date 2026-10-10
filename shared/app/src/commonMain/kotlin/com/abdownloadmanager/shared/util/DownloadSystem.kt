@@ -180,12 +180,27 @@ class DownloadSystem(
     }
 
     suspend fun stopAnything() {
-        queueManager.getAll().forEach {
-            it.stop()
+        val wasStopping = downloadManager.isStoppingAll
+        downloadManager.isStoppingAll = true
+        try {
+            queueManager.getAll().forEach {
+                it.stop()
+            }
+            manualDownloadQueue.clearQueue()
+            downloadManager.stopAll()
+        } finally {
+            downloadManager.isStoppingAll = wasStopping
         }
-        manualDownloadQueue.clearQueue()
-        downloadManager.stopAll()
     }
+
+    /** Live recordings interrupted by closing the app (or an error): each can continue (resume) or be finished */
+    suspend fun getInterruptedLiveRecordingIds(): List<Long> {
+        return downloadListDB.getAll().map { it.id }.filter { downloadManager.isInterruptedLiveRecording(it) }
+    }
+
+    suspend fun isInterruptedLiveRecording(id: Long): Boolean = downloadManager.isInterruptedLiveRecording(id)
+
+    suspend fun finishInterruptedLiveRecording(id: Long): Boolean = downloadManager.finishInterruptedLiveRecording(id)
 
     suspend fun stopQueue(
         queueId: Long,

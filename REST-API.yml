@@ -30,13 +30,15 @@ paths:
                     properties:
                       type:
                         type: string
-                        enum: [ http, hls, segments ]
+                        enum: [ http, hls, segments, av ]
                         description: >
                           Kind of download; "hls" for HLS (.m3u8) playlists; "segments" for a stream the
                           extension rebuilt from its numbered fMP4/TS segments because no manifest was found
-                          (download init + segments in order into ONE file; see init/segments below).
+                          (download init + segments in order into ONE file; see init/segments below); "av" for a
+                          video whose picture and sound are two separate whole files (DASH-style, often fetched by
+                          the player in byte ranges): both are downloaded and merged into ONE .mp4 (needs ffmpeg).
                           Clients must check GET /capabilities first and only send types listed in jobTypes
-                          (apps without /capabilities don't support "segments").
+                          (apps without /capabilities don't support "segments" or "av").
                       link:
                         type: string
                         description: The link to the download source
@@ -81,7 +83,7 @@ paths:
                       duration:
                         type: number
                         nullable: true
-                        description: type "segments" only, optional - total duration in seconds (shown in the dialog)
+                        description: types "segments" and "av", optional - total duration in seconds (shown in the dialog)
                       estimatedSize:
                         type: integer
                         format: int64
@@ -90,7 +92,29 @@ paths:
                       quality:
                         type: string
                         nullable: true
-                        description: type "segments" only, optional - quality label shown in the dialog, e.g. "1080p"
+                        description: types "segments" and "av", optional - quality label shown in the dialog, e.g. "1080p"
+                      video:
+                        type: string
+                        description: >
+                          type "av" only (required there): URL of the whole video file (without byte-range
+                          query parameters)
+                      audio:
+                        type: string
+                        nullable: true
+                        description: type "av" only, optional - URL of the whole audio file
+                      videoSize:
+                        type: integer
+                        format: int64
+                        nullable: true
+                        description: >
+                          type "av" only, optional - full size of the video file in bytes. Send it only when the
+                          server answers Range requests with 206: the app then downloads byte-range parts in
+                          parallel; without it the file is downloaded in one piece
+                      audioSize:
+                        type: integer
+                        format: int64
+                        nullable: true
+                        description: type "av" only, optional - full size of the audio file in bytes (same rule)
                 options:
                   type: object
                   description: Optional; all fields default to false
@@ -135,6 +159,24 @@ paths:
                   options:
                     silentAdd: false
                     silentStart: false
+              av:
+                summary: Separate video and audio files (DASH-style, no manifest)
+                value:
+                  items:
+                    - type: av
+                      link: https://video.example.com/v/abc-video.mp4
+                      headers: { "Referer": "https://example.com/reel/1" }
+                      downloadPage: https://example.com/reel/1
+                      suggestedName: "Example reel.mp4"
+                      video: https://video.example.com/v/abc-video.mp4
+                      audio: https://video.example.com/v/abc-audio.mp4
+                      videoSize: 4570000
+                      audioSize: 181000
+                      duration: 30.5
+                      quality: "720p"
+                  options:
+                    silentAdd: false
+                    silentStart: false
       responses:
         "200":
           description: Successfully added the download
@@ -170,7 +212,7 @@ paths:
                     items:
                       type: string
                     description: /add item types accepted
-                    example: [ http, hls, segments ]
+                    example: [ http, hls, segments, av ]
                   features:
                     type: object
                     additionalProperties:

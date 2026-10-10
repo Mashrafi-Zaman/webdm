@@ -147,18 +147,6 @@ buildConfig {
         }
     )
     buildConfigField(
-        "INTEGRATION_FIREFOX_LINK",
-        provider {
-            "https://addons.mozilla.org/en-US/firefox/addon/YOUR_FIREFOX_ADDON_SLUG/"
-        }
-    )
-    buildConfigField(
-        "INTEGRATION_FIREFOX_EXTENSION_ID",
-        provider {
-            "firefox-integration@webdm"
-        }
-    )
-    buildConfigField(
         "INTEGRATION_CHROME_EXTENSION_ID",
         provider {
             "chrome-extension://aciclgnjjaijdpnkkgileppmbpldobjj/"

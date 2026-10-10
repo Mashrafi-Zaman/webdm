@@ -54,6 +54,29 @@ data class SegmentsDownloadCredentialsFromIntegration(
     val quality: String? = null,
 ) : IDownloadCredentialsFromIntegration
 
+/**
+ * A video whose picture and sound are two separate whole files (DASH-style, e.g. what a player fetches in byte
+ * ranges without a visible manifest). Both are downloaded (in byte-range parts when their sizes are known) and
+ * merged with ffmpeg into ONE .mp4. See REST-API.yml.
+ */
+@SerialName("av")
+@Serializable
+data class AvDownloadCredentialsFromIntegration(
+    override val link: String,
+    val headers: Map<String, String>? = null,
+    override val downloadPage: String? = null,
+    override val suggestedName: String? = null,
+    val video: String,
+    val audio: String? = null,
+    // full sizes in bytes; known sizes let the app download in parallel byte-range parts
+    val videoSize: Long? = null,
+    val audioSize: Long? = null,
+    // seconds
+    val duration: Double? = null,
+    // e.g. "720p"
+    val quality: String? = null,
+) : IDownloadCredentialsFromIntegration
+
 @Serializable
 data class AddDownloadOptionsFromIntegration(
     val silentAdd: Boolean = false,

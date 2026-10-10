@@ -122,6 +122,7 @@ class HLSDownloadJob(
         downloadItem.completeTime = null
         downloadItem.duration = null
         isLiveRecording = false
+        downloadItem.liveRecording = false
         downloadedSizeBeforeRetry = 0 // nothing
         saveState()
         downloadManager.onDownloadItemChange(downloadItem)
@@ -540,13 +541,19 @@ class HLSDownloadJob(
 
     private suspend fun fetchDownloadInfoAndValidate(): ResolvedHLSStream? {
         var stream: ResolvedHLSStream? = null
-        if (parts.isEmpty() || isLiveRecording || needsStreamInfo()) {
+        if (parts.isEmpty() || isLiveRecording || downloadItem.liveRecording || needsStreamInfo()) {
             stream = pendingStreamFromDialog?.takeIf { parts.isEmpty() }
                 ?: HLSResponseInfo.resolve(client, downloadItem).stream
             pendingStreamFromDialog = null
             validateStream(stream)
             isLiveRecording = stream.isLive
             updateParts(stream)
+            downloadItem.liveRecording = stream.isLive
+        } else {
+            // the parts came from the add-download dialog (or an earlier run): still check what the stream needs
+            // (ffmpeg, no DRM) before downloading anything, not only when the file is put together at the end
+            pendingStreamFromDialog?.let { validateStream(it) } ?: validatePartRequirements()
+            pendingStreamFromDialog = null
         }
         // at this point we have all the parts we need either by hitting remote or they are already in destination
         // before proceed we should check the downloaded parts and remove the "isCompleted" flag if they are missing
@@ -584,6 +591,13 @@ class HLSDownloadJob(
         }
     }
 
+    /** What the known parts need when the stream itself isn't fetched again (see [validateStream]). */
+    private fun validatePartRequirements() {
+        if (getParts().any { it.track == 1 } && mediaTools.ffmpegPath() == null) {
+            throw FfmpegMissingException("A video with a separate audio track")
+        }
+    }
+
     /**
      * New playlist data: keep the completion state of parts we already have (same id = same track, sequence and
      * kind) and add new ones (live streams). If a segment changed its duration the stream changed: start over.
@@ -609,8 +623,9 @@ class HLSDownloadJob(
                 if (oldPart != null) newPart.copy(isCompleted = oldPart.isCompleted, length = oldPart.length) else newPart
             )
         }
-        if (stream.isLive) {
-            // a live playlist only lists recent segments: keep the recorded ones that already left it
+        if (stream.isLive || downloadItem.liveRecording) {
+            // a live playlist only lists recent segments: keep the recorded ones that already left it (also when
+            // an interrupted recording is continued after the stream ended)
             val newIds = newParts.map { it.getID() }.toHashSet()
             merged.addAll(currentParts.filter { it.getID() !in newIds && it.isCompleted })
         }
@@ -644,10 +659,33 @@ class HLSDownloadJob(
     /** "Stop" on a live recording: keep what was recorded and write the file. */
     private suspend fun finishLiveRecording() {
         isLiveRecording = false
+        downloadItem.liveRecording = false
         clearPartDownloaderList()
         setParts(getParts().filter { it.isCompleted })
         saveState()
         finishOnce()
+    }
+
+    /** Is this a live recording that was interrupted (app closed, error) and can continue or be finished? */
+    fun isInterruptedLiveRecording(): Boolean {
+        return downloadItem.liveRecording && !isDownloadActive.value && downloadItem.status != DownloadStatus.Completed
+    }
+
+    /** Finish an interrupted live recording: write what was recorded instead of continuing it. */
+    suspend fun finishInterruptedLiveRecording(): Boolean {
+        boot()
+        if (!isInterruptedLiveRecording() || getParts().none { it.isCompleted && !it.isInit }) {
+            return false
+        }
+        // init segments are kept: the recorded fMP4 segments need them
+        val keep = getParts().filter { it.isCompleted || it.isInit }
+        setParts(keep)
+        if (keep.any { !it.isCompleted }) {
+            return false
+        }
+        finishRequested.set(false)
+        finishLiveRecording()
+        return true
     }
 
     private suspend fun downloadWithFfmpeg(stream: ResolvedHLSStream) {
@@ -714,8 +752,10 @@ class HLSDownloadJob(
         cancelRetry()
         cancelDownloadScope()
         stopAllParts()
-        if (isLiveRecording && ExceptionUtils.isNormalCancellation(throwable) && getParts().any { it.isCompleted }) {
-            // user pressed stop on a live recording: write what was recorded
+        if (isLiveRecording && !downloadManager.isStoppingAll
+            && ExceptionUtils.isNormalCancellation(throwable) && getParts().any { it.isCompleted }) {
+            // user pressed stop on a live recording: write what was recorded (not when the app exits: then it's
+            // kept as an interrupted recording, to continue or finish on the next start)
             finishLiveRecording()
             return
         }
@@ -723,6 +763,7 @@ class HLSDownloadJob(
     }
 
     override fun onDownloadFinishedBeforeSave() {
+        downloadItem.liveRecording = false
         downloadItem.contentLength = destination.outputFile.length()
     }
 
@@ -770,6 +811,7 @@ class HLSDownloadJob(
             pendingStreamFromDialog = it
             if (parts.isEmpty()) {
                 isLiveRecording = it.isLive
+                downloadItem.liveRecording = it.isLive
                 updateParts(it)
                 saveParts()
             }

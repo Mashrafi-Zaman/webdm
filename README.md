@@ -71,7 +71,8 @@ For alternative installation methods, uninstallation instructions, and more deta
 ### Browser Extensions
 
 You can install the **WebDM Integration** browser extension to integrate the app with your browser.
-It is not in the Chrome Web Store or Firefox Add-ons yet; build it from
+It works in Chromium browsers (Chrome, Edge, Brave, Opera); Firefox is not supported.
+It is not in the Chrome Web Store yet; build it from
 [Mashrafi-Zaman/webdm-extension](https://github.com/Mashrafi-Zaman/webdm-extension) and load it unpacked.
 
 ## Screenshots

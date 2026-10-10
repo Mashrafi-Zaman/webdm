@@ -15,6 +15,7 @@ import ir.amirab.util.compose.action.buildMenu
 import ir.amirab.util.compose.action.simpleAction
 import ir.amirab.util.compose.asStringSource
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -55,11 +56,37 @@ class DesktopDownloadActions(
         }
     )
 
+    // a live recording interrupted by closing the app: "Resume" continues it, this writes what was recorded
+    private val hasInterruptedLiveRecording = MutableStateFlow(false)
+
+    init {
+        scope.launch {
+            selections.collect { selected ->
+                hasInterruptedLiveRecording.value = selected.any { downloadSystem.isInterruptedLiveRecording(it.id) }
+            }
+        }
+    }
+
+    val finishLiveRecordingAction = simpleAction(
+        title = "Finish live recording (save what was recorded)".asStringSource(),
+        icon = MyIcons.check,
+        checkEnable = hasInterruptedLiveRecording,
+        onActionPerformed = {
+            scope.launch {
+                selections.value.forEach {
+                    downloadSystem.finishInterruptedLiveRecording(it.id)
+                }
+                hasInterruptedLiveRecording.value = false
+            }
+        }
+    )
+
     val menu: List<MenuItem> = buildMenu {
         +openFileAction
         +openFolderAction
         +(resumeAction)
         +pauseAction
+        +finishLiveRecordingAction
         separator()
         +(deleteAction)
         +(reDownloadAction)

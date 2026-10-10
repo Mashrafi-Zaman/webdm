@@ -51,40 +51,46 @@ abstract class NativeMessagingManifestApplier(val json: Json) : KoinComponent {
 
 class WindowsNativeMessagingManifestApplier(json: Json) : NativeMessagingManifestApplier(json) {
     private val baseNativeMessagingDir get() = AppInfo.definedPaths.configDir / "native_messaging"
-    private val firefoxManifestFile get() = baseNativeMessagingDir / "firefox" / "${AppInfo.packageName}.json"
     private val chromeManifestFile get() = baseNativeMessagingDir / "chrome" / "${AppInfo.packageName}.json"
-    private val firefoxRegistryPath get() = "HKCU\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\${AppInfo.packageName}"
-    private val chromeRegistryPath get() = "HKCU\\SOFTWARE\\Google\\Chrome\\NativeMessagingHosts\\${AppInfo.packageName}"
+
+    // Chromium browsers read their own HKCU key; Opera (and most other Chromium forks) read Chrome's
+    private val chromiumRegistryPaths
+        get() = listOf(
+            "Google\\Chrome",
+            "Microsoft\\Edge",
+            "BraveSoftware\\Brave-Browser",
+        ).map { "HKCU\\SOFTWARE\\$it\\NativeMessagingHosts\\${AppInfo.packageName}" }
+
+    // left behind by older versions that also supported Firefox
+    private val legacyFirefoxManifestFile get() = baseNativeMessagingDir / "firefox" / "${AppInfo.packageName}.json"
+    private val legacyFirefoxRegistryPath get() = "HKCU\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\${AppInfo.packageName}"
 
     override fun updateManifests(
         manifests: NativeMessagingManifests
     ) {
-        writeManifestContent(firefoxManifestFile, serialize(manifests.firefoxNativeMessagingManifest))
-        WindowsRegistry.setValueInRegistry(
-            path = firefoxRegistryPath,
-            key = null,
-            value = firefoxManifestFile.toString()
-        )
-
+        removeLegacyFirefoxManifest()
         writeManifestContent(chromeManifestFile, serialize(manifests.chromeNativeMessagingManifest))
-        WindowsRegistry.setValueInRegistry(
-            path = chromeRegistryPath,
-            key = null,
-            value = chromeManifestFile.toString()
-        )
+        chromiumRegistryPaths.forEach { path ->
+            WindowsRegistry.setValueInRegistry(
+                path = path,
+                key = null,
+                value = chromeManifestFile.toString()
+            )
+        }
     }
 
     override fun removeManifests() {
-        firefoxManifestFile.deleteIfExists()
-        WindowsRegistry.removePathInRegistry(
-            path = firefoxRegistryPath,
-        )
+        removeLegacyFirefoxManifest()
         chromeManifestFile.deleteIfExists()
-        WindowsRegistry.removePathInRegistry(
-            path = chromeRegistryPath,
-        )
+        chromiumRegistryPaths.forEach { path ->
+            WindowsRegistry.removePathInRegistry(path = path)
+        }
     }
 
+    private fun removeLegacyFirefoxManifest() {
+        legacyFirefoxManifestFile.deleteIfExists()
+        WindowsRegistry.removePathInRegistry(path = legacyFirefoxRegistryPath)
+    }
 }
 
 class MacosNativeMessagingManifestApplier(
@@ -93,7 +99,6 @@ class MacosNativeMessagingManifestApplier(
 
     private val nativeMessagingFileName = "${AppInfo.packageName}.json"
 
-    // firefox and chromium paths are the same just app name is different
     private fun createNativeMessagingPath(appSupportDir: String) =
         Path(
             AppProperties.userDir,
@@ -103,9 +108,6 @@ class MacosNativeMessagingManifestApplier(
             nativeMessagingFileName
         ).toOkioPath()
 
-    private val firefoxNativeMessagingPaths = listOf(
-        createNativeMessagingPath("Mozilla")
-    )
 
     private val chromiumBasedNativeMessagingPaths = listOf(
         createNativeMessagingPath("Google/Chrome"),
@@ -113,11 +115,6 @@ class MacosNativeMessagingManifestApplier(
     )
 
     override fun updateManifests(manifests: NativeMessagingManifests) {
-        val firefoxManifest = serialize(manifests.firefoxNativeMessagingManifest)
-        firefoxNativeMessagingPaths.forEach { path ->
-            writeManifestContent(path, firefoxManifest)
-        }
-
         val chromiumManifest = serialize(manifests.chromeNativeMessagingManifest)
         chromiumBasedNativeMessagingPaths.forEach { path ->
             writeManifestContent(path, chromiumManifest)
@@ -125,10 +122,6 @@ class MacosNativeMessagingManifestApplier(
     }
 
     override fun removeManifests() {
-        firefoxNativeMessagingPaths.forEach { path ->
-            path.deleteIfExists()
-        }
-
         chromiumBasedNativeMessagingPaths.forEach { path ->
             path.deleteIfExists()
         }
@@ -141,14 +134,6 @@ class LinuxNativeMessagingManifestApplier(
 
     private val nativeMessagingFileName = "${AppInfo.packageName}.json"
 
-    private val firefoxNativeMessagingPaths
-        get() = listOf(
-            Path(
-                AppProperties.userDir,
-                ".mozilla/native-messaging-hosts",
-                nativeMessagingFileName
-            ).toOkioPath()
-        )
 
 
     private fun createChromiumNativeMessagingPath(browserConfigDir: String) = Path(
@@ -170,11 +155,6 @@ class LinuxNativeMessagingManifestApplier(
         )
 
     override fun updateManifests(manifests: NativeMessagingManifests) {
-        val firefoxManifest = serialize(manifests.firefoxNativeMessagingManifest)
-        firefoxNativeMessagingPaths.forEach { path ->
-            writeManifestContent(path, firefoxManifest)
-        }
-
         val chromiumManifest = serialize(manifests.chromeNativeMessagingManifest)
         chromiumBasedNativeMessagingPaths.forEach { path ->
             writeManifestContent(path, chromiumManifest)
@@ -182,10 +162,6 @@ class LinuxNativeMessagingManifestApplier(
     }
 
     override fun removeManifests() {
-        firefoxNativeMessagingPaths.forEach { path ->
-            path.deleteIfExists()
-        }
-
         chromiumBasedNativeMessagingPaths.forEach { path ->
             path.deleteIfExists()
         }
