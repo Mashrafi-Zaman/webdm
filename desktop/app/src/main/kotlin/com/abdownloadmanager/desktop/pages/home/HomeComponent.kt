@@ -314,13 +314,10 @@ class HomeComponent(
     }
 
     fun onExternalFilesDraggedIn(getFilePaths: () -> List<File>) {
-        val filePaths = kotlin.runCatching { getFilePaths() }
-            .getOrNull()?.filter { it.length() <= 1024 * 1024 } ?: return
+        val files = kotlin.runCatching { getFilePaths() }.getOrNull() ?: return
+        // every dropped text file (e.g. .txt lists of URLs), not just the first
         onExternalTextDraggedIn {
-            filePaths
-                .firstOrNull()
-                ?.readText()
-                .orEmpty()
+            com.abdownloadmanager.desktop.floatingdrop.droppedFilesText(files)
         }
     }
 

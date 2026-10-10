@@ -11,6 +11,7 @@ import com.abdownloadmanager.desktop.window.Browser
 import ir.amirab.util.compose.action.MenuItem
 import ir.amirab.util.compose.action.buildMenu
 import ir.amirab.util.compose.action.simpleAction
+import ir.amirab.util.compose.action.toggleableAction
 import com.abdownloadmanager.shared.util.getIcon
 import com.abdownloadmanager.shared.util.getName
 import com.abdownloadmanager.resources.Res
@@ -97,6 +98,14 @@ val openAboutAction = createOpenAboutPage(appComponent)
 val checkForUpdateAction = createCheckForUpdateAction(appComponent.updater)
 val gotoSettingsAction = createOpenSettingsAction(appComponent)
 val useSpeedLimiterAction = createUseSpeedLimiterAction(appComponent.appRepository)
+private val floatingDropTargetSettings = Di.get<com.abdownloadmanager.desktop.floatingdrop.FloatingDropTargetSettings>()
+val floatingDropTargetAction = toggleableAction(
+    "Floating drop target".asStringSource(),
+    MyIcons.download,
+    isToggled = floatingDropTargetSettings.enabled,
+) {
+    floatingDropTargetSettings.enabled.value = !floatingDropTargetSettings.enabled.value
+}
 val perHostSettings = createPerHostSettingsPage(appComponent)
 val requestExitAction = createRequestExitAction(scope, appComponent)
 val startQueueGroupAction = createStartQueueGroupAction(scope, appComponent.downloadSystem.queueManager)

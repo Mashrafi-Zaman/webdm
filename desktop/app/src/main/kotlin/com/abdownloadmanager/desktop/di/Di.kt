@@ -89,6 +89,7 @@ import org.koin.dsl.module
 import com.abdownloadmanager.updatechecker.GithubUpdateChecker
 import com.abdownloadmanager.desktop.tools.FfmpegManager
 import com.abdownloadmanager.desktop.tools.YtDlpManager
+import com.abdownloadmanager.desktop.floatingdrop.FloatingDropTargetSettings
 import com.abdownloadmanager.desktop.tools.DesktopMediaTools
 import ir.amirab.downloader.downloaditem.hls.HLSMediaTools
 import com.abdownloadmanager.updatechecker.UpdateChecker
@@ -235,6 +236,10 @@ val downloaderModule = module {
     }
     single {
         YtDlpManager(scope = get())
+    }
+    // the floating drop target (Settings / tray)
+    single {
+        FloatingDropTargetSettings(scope = get())
     }
     single<HLSMediaTools> {
         DesktopMediaTools(ffmpeg = get(), ytDlp = get())

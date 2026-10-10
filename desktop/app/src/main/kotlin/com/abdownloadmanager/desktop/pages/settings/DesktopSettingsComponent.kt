@@ -74,6 +74,7 @@ class DesktopSettingsComponent(
     private val customRenderApi by inject<CustomRenderApi>()
     private val ffmpegManager by inject<FfmpegManager>()
     private val ytDlpManager by inject<YtDlpManager>()
+    private val floatingDropTarget by inject<com.abdownloadmanager.desktop.floatingdrop.FloatingDropTargetSettings>()
     private val allConfigs = object : SettingSectionGetter {
         override operator fun get(key: SettingSection): List<ConfigurableGroup> {
             return when (key) {
@@ -107,6 +108,16 @@ class DesktopSettingsComponent(
                         nestedConfigurable = listOf(
                             CommonSettings.autoStartConfig(appSettings),
                             DesktopSettings.useSystemTray(appSettings),
+                            BooleanConfigurable(
+                                title = "Floating drop target".asStringSource(),
+                                description = ("A small always-on-top WebDM logo you can drop links from the browser " +
+                                        "on. Drag it anywhere; right-click it for Add URL, Pause all and Hide. Also in " +
+                                        "the tray menu.").asStringSource(),
+                                backedBy = floatingDropTarget.enabled,
+                                describe = {
+                                    if (it) Res.string.enabled.asStringSource() else Res.string.disabled.asStringSource()
+                                },
+                            ),
                         )
                     ),
                     ConfigurableGroup(

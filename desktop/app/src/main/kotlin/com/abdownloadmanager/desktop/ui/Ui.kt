@@ -10,6 +10,10 @@ import com.abdownloadmanager.desktop.actions.newDownloadFromClipboardAction
 import com.abdownloadmanager.desktop.actions.requestExitAction
 import com.abdownloadmanager.desktop.actions.showDownloadList
 import com.abdownloadmanager.desktop.actions.useSpeedLimiterAction
+import com.abdownloadmanager.desktop.actions.floatingDropTargetAction
+import com.abdownloadmanager.desktop.actions.newDownloadAction
+import com.abdownloadmanager.desktop.actions.stopAllAction
+import com.abdownloadmanager.desktop.di.Di
 import com.abdownloadmanager.desktop.pages.about.ShowAboutDialog
 import com.abdownloadmanager.desktop.pages.addDownload.ShowAddDownloadDialogs
 import com.abdownloadmanager.desktop.pages.batchdownload.BatchDownloadWindow
@@ -109,6 +113,13 @@ object Ui : KoinComponent {
             ) {
                 HandleEffectsForApp(appComponent)
                 SystemTray(appComponent)
+                com.abdownloadmanager.desktop.floatingdrop.FloatingDropTarget(
+                    appComponent = appComponent,
+                    settings = remember { Di.get<com.abdownloadmanager.desktop.floatingdrop.FloatingDropTargetSettings>() },
+                    onAddUrl = { newDownloadAction.onClick() },
+                    onPauseAll = { stopAllAction.onClick() },
+                    onOpenWebDM = { showDownloadList.onClick() },
+                )
 
                 HomeWindow(appComponent)
                 SettingWindow(appComponent)
@@ -215,6 +226,7 @@ private fun SystemTray(
                 +newDownloadFromClipboardAction
                 separator()
                 +useSpeedLimiterAction
+                +floatingDropTargetAction
                 +gotoSettingsAction
                 separator()
                 +requestExitAction
