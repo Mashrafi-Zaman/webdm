@@ -17,6 +17,13 @@ WebDM 1.0.0 is based on AB Download Manager 1.10.4; the earlier history is in
 
 ### Security
 
+## 1.0.1
+
+### Fixed
+
+- Browser extension: tiny audio/video files (under 64 KB, such as a site's voice-search sounds "open", "success",
+  "failure" and "no_input") are no longer listed as downloadable media
+
 ## 1.0.0
 
 First release of WebDM (Web Download Manager), a Windows x64 fork of AB Download Manager 1.10.4.
@@ -50,3 +57,8 @@ First release of WebDM (Web Download Manager), a Windows x64 fork of AB Download
 
 - The uninstaller removes the autostart entry and the browser native-messaging registrations
 - Drops from Explorer are copies (a dropped file is never deleted afterwards)
+
+### Security
+
+- The native-messaging host only accepts the WebDM extension IDs listed in the app (TrustedExtensions.kt); the same
+  list is used for the host manifest's allowed origins
